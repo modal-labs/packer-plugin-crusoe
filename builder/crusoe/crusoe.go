@@ -2,10 +2,16 @@ package crusoe
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"sort"
+	"strings"
 	"time"
 )
 
@@ -13,15 +19,17 @@ import (
 type Client struct {
 	accessKeyID     string
 	secretAccessKey string
+	projectID       string
 	apiEndpoint     string
 	httpClient      *http.Client
 }
 
 // NewClient creates a new Crusoe API client
-func NewClient(accessKeyID, secretAccessKey, apiEndpoint string) *Client {
+func NewClient(accessKeyID, secretAccessKey, projectID, apiEndpoint string) *Client {
 	return &Client{
 		accessKeyID:     accessKeyID,
 		secretAccessKey: secretAccessKey,
+		projectID:       projectID,
 		apiEndpoint:     apiEndpoint,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
@@ -29,8 +37,8 @@ func NewClient(accessKeyID, secretAccessKey, apiEndpoint string) *Client {
 	}
 }
 
-// doRequest performs an HTTP request with authentication
-func (c *Client) doRequest(method, path string, body interface{}) ([]byte, error) {
+// doRequest performs an HTTP request with HMAC authentication
+func (c *Client) doRequest(method, path string, body interface{}, queryParams url.Values) ([]byte, error) {
 	var reqBody io.Reader
 	if body != nil {
 		jsonData, err := json.Marshal(body)
@@ -40,14 +48,22 @@ func (c *Client) doRequest(method, path string, body interface{}) ([]byte, error
 		reqBody = bytes.NewBuffer(jsonData)
 	}
 
-	url := fmt.Sprintf("%s%s", c.apiEndpoint, path)
-	req, err := http.NewRequest(method, url, reqBody)
+	fullURL := fmt.Sprintf("%s%s", c.apiEndpoint, path)
+	if len(queryParams) > 0 {
+		fullURL += "?" + queryParams.Encode()
+	}
+
+	req, err := http.NewRequest(method, fullURL, reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 
+	// Add HMAC authentication headers
+	if err := c.addAuthHeaders(req); err != nil {
+		return nil, fmt.Errorf("add auth headers: %w", err)
+	}
+
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.secretAccessKey))
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -61,10 +77,78 @@ func (c *Client) doRequest(method, path string, body interface{}) ([]byte, error
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(respBody))
+		return nil, fmt.Errorf("API request failed with status %d: %s (URL: %s %s)", resp.StatusCode, string(respBody), method, req.URL.String())
 	}
 
 	return respBody, nil
+}
+
+// addAuthHeaders adds HMAC-based authentication headers to the request
+func (c *Client) addAuthHeaders(req *http.Request) error {
+	// Generate RFC3339 timestamp
+	timestamp := time.Now().UTC().Format(time.RFC3339)
+
+	// Build signature payload
+	// Format: http_path\ncanonical_query_params\nhttp_verb\ntimestamp\n
+	path := req.URL.Path
+	queryParams := c.canonicalizeQueryParams(req.URL.Query())
+	method := req.Method
+	payload := fmt.Sprintf("%s\n%s\n%s\n%s\n", path, queryParams, method, timestamp)
+
+	// Create HMAC SHA256 signature
+	// Per Crusoe API docs, secret key must be base64url-decoded to raw bytes
+	secretKeyBytes, err := c.decodeSecretKey()
+	if err != nil {
+		return fmt.Errorf("decode secret key: %w", err)
+	}
+
+	h := hmac.New(sha256.New, secretKeyBytes)
+	h.Write([]byte(payload))
+	signature := h.Sum(nil)
+
+	// Base64url encode the signature without padding
+	signatureB64 := base64.URLEncoding.EncodeToString(signature)
+	signatureB64 = strings.TrimRight(signatureB64, "=")
+
+	// Set headers
+	req.Header.Set("X-Crusoe-Timestamp", timestamp)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer 1.0:%s:%s", c.accessKeyID, signatureB64))
+
+	return nil
+}
+
+// decodeSecretKey decodes the base64url-encoded secret key
+func (c *Client) decodeSecretKey() ([]byte, error) {
+	// Add padding if necessary
+	key := c.secretAccessKey
+	if padding := len(key) % 4; padding != 0 {
+		key += strings.Repeat("=", 4-padding)
+	}
+
+	return base64.URLEncoding.DecodeString(key)
+}
+
+// canonicalizeQueryParams canonicalizes query parameters by sorting them lexicographically
+func (c *Client) canonicalizeQueryParams(params url.Values) string {
+	if len(params) == 0 {
+		return ""
+	}
+
+	// Sort params by key and format as key=value pairs
+	keys := make([]string, 0, len(params))
+	for k := range params {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	pairs := make([]string, 0, len(keys))
+	for _, k := range keys {
+		for _, v := range params[k] {
+			pairs = append(pairs, fmt.Sprintf("%s=%s", k, v))
+		}
+	}
+
+	return strings.Join(pairs, "&")
 }
 
 // Instance represents a Crusoe VM instance
@@ -116,10 +200,12 @@ type DiskCreateRequest struct {
 type CreateInstanceResponse struct {
 	Instance Instance `json:"instance"`
 }
-
+https://api.crusoecloud.com/v1alpha5/projects/{project_id}/compute/vms/instances
 // CreateInstance creates a new VM instance
 func (c *Client) CreateInstance(req *CreateInstanceRequest) (*Instance, error) {
-	respBody, err := c.doRequest("POST", "/v1alpha5/compute/instances", req)
+	path := fmt.Sprintf("/v1alpha5/projects/%s/compute/vms/instances", c.projectID)
+
+	respBody, err := c.doRequest("POST", path, req, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +220,11 @@ func (c *Client) CreateInstance(req *CreateInstanceRequest) (*Instance, error) {
 
 // GetInstance retrieves an instance by ID
 func (c *Client) GetInstance(instanceID string) (*Instance, error) {
-	respBody, err := c.doRequest("GET", fmt.Sprintf("/v1alpha5/compute/instances/%s", instanceID), nil)
+	path := fmt.Sprintf("/v1alpha5/projects/%s/compute/vms/instances/%s", c.projectID, instanceID)
+	query := url.Values{}
+	query.Set("project_id", c.projectID)
+
+	respBody, err := c.doRequest("GET", path, nil, query)
 	if err != nil {
 		return nil, err
 	}
@@ -154,13 +244,21 @@ type UpdateInstanceRequest struct {
 
 // UpdateInstance updates an instance (e.g., to shut it down)
 func (c *Client) UpdateInstance(instanceID string, req *UpdateInstanceRequest) error {
-	_, err := c.doRequest("PATCH", fmt.Sprintf("/v1alpha5/compute/instances/%s", instanceID), req)
+	path := fmt.Sprintf("/v1alpha5/projects/%s/compute/vms/instances/%s", c.projectID, instanceID)
+	query := url.Values{}
+	query.Set("project_id", c.projectID)
+
+	_, err := c.doRequest("PATCH", path, req, query)
 	return err
 }
 
 // DeleteInstance deletes an instance
 func (c *Client) DeleteInstance(instanceID string) error {
-	_, err := c.doRequest("DELETE", fmt.Sprintf("/v1alpha5/compute/instances/%s", instanceID), nil)
+	path := fmt.Sprintf("/v1alpha5/projects/%s/compute/vms/instances/%s", c.projectID, instanceID)
+	query := url.Values{}
+	query.Set("project_id", c.projectID)
+
+	_, err := c.doRequest("DELETE", path, nil, query)
 	return err
 }
 
@@ -188,7 +286,9 @@ type CreateCustomImageResponse struct {
 
 // CreateCustomImage creates a custom image from a disk
 func (c *Client) CreateCustomImage(req *CreateCustomImageRequest) (*CustomImage, error) {
-	respBody, err := c.doRequest("POST", "/v1alpha5/compute/custom-images", req)
+	path := fmt.Sprintf("/v1alpha5/projects/%s/compute/custom-images", c.projectID)
+
+	respBody, err := c.doRequest("POST", path, req, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +303,9 @@ func (c *Client) CreateCustomImage(req *CreateCustomImageRequest) (*CustomImage,
 
 // GetCustomImage retrieves a custom image by ID
 func (c *Client) GetCustomImage(imageID string) (*CustomImage, error) {
-	respBody, err := c.doRequest("GET", fmt.Sprintf("/v1alpha5/compute/custom-images/%s", imageID), nil)
+	path := fmt.Sprintf("/v1alpha5/projects/%s/compute/custom-images/%s", c.projectID, imageID)
+
+	respBody, err := c.doRequest("GET", path, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +320,11 @@ func (c *Client) GetCustomImage(imageID string) (*CustomImage, error) {
 
 // DeleteCustomImage deletes a custom image
 func (c *Client) DeleteCustomImage(imageID string) error {
-	_, err := c.doRequest("DELETE", fmt.Sprintf("/v1alpha5/compute/custom-images/%s", imageID), nil)
+	path := fmt.Sprintf("/v1alpha5/compute/custom-images/%s", imageID)
+	query := url.Values{}
+	query.Set("project_id", c.projectID)
+
+	_, err := c.doRequest("DELETE", path, nil, query)
 	return err
 }
 
@@ -242,7 +348,7 @@ type CreateSSHKeyResponse struct {
 
 // CreateSSHKey creates an SSH key
 func (c *Client) CreateSSHKey(req *CreateSSHKeyRequest) (*SSHKey, error) {
-	respBody, err := c.doRequest("POST", "/v1alpha5/ssh-keys", req)
+	respBody, err := c.doRequest("POST", "/users/ssh-keys", req, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -257,6 +363,6 @@ func (c *Client) CreateSSHKey(req *CreateSSHKeyRequest) (*SSHKey, error) {
 
 // DeleteSSHKey deletes an SSH key
 func (c *Client) DeleteSSHKey(keyID string) error {
-	_, err := c.doRequest("DELETE", fmt.Sprintf("/v1alpha5/ssh-keys/%s", keyID), nil)
+	_, err := c.doRequest("DELETE", fmt.Sprintf("/users/ssh-keys/%s", keyID), nil, nil)
 	return err
 }

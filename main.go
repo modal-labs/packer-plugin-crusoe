@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/crusoecloud/packer-plugin-crusoe/builder/crusoe"
 	"github.com/hashicorp/packer-plugin-sdk/plugin"
 	"github.com/hashicorp/packer-plugin-sdk/version"
+	"github.com/modal-labs/packer-plugin-crusoe/builder/crusoe"
 )
 
 var (

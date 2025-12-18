@@ -37,7 +37,7 @@ func (b *Builder) Prepare(raws ...interface{}) ([]string, []string, error) {
 func (b *Builder) Run(ctx context.Context, ui packer.Ui, hook packer.Hook) (ret packer.Artifact, err error) {
 	ui.Say("Running Crusoe builder...")
 
-	client := NewClient(b.config.AccessKeyID, b.config.SecretAccessKey, b.config.APIEndpoint)
+	client := NewClient(b.config.AccessKeyID, b.config.SecretAccessKey, b.config.ProjectID, b.config.APIEndpoint)
 
 	state := new(multistep.BasicStateBag)
 	state.Put("config", &b.config)

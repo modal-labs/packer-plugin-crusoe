@@ -1,4 +1,4 @@
-module github.com/crusoecloud/packer-plugin-crusoe
+module github.com/modal-labs/packer-plugin-crusoe
 
 go 1.24.0
 

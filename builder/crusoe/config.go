@@ -28,6 +28,7 @@ type Config struct {
 	// Authentication
 	AccessKeyID     string `mapstructure:"access_key_id"`
 	SecretAccessKey string `mapstructure:"secret_access_key"`
+	ProjectID       string `mapstructure:"project_id"`
 	APIEndpoint     string `mapstructure:"api_endpoint"`
 
 	// Instance configuration
@@ -91,6 +92,13 @@ func (c *Config) Prepare(raws ...interface{}) error {
 		c.SecretAccessKey = os.Getenv("CRUSOE_SECRET_ACCESS_KEY")
 		if c.SecretAccessKey == "" {
 			errs = packer.MultiErrorAppend(errs, errors.New("secret_access_key is required"))
+		}
+	}
+
+	if c.ProjectID == "" {
+		c.ProjectID = os.Getenv("CRUSOE_PROJECT_ID")
+		if c.ProjectID == "" {
+			errs = packer.MultiErrorAppend(errs, errors.New("project_id is required"))
 		}
 	}
 

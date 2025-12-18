@@ -20,7 +20,7 @@ packer {
   required_plugins {
     crusoe = {
       version = ">= 1.0.0"
-      source  = "github.com/crusoecloud/crusoe"
+      source  = "github.com/modal-labs/crusoe"
     }
   }
 }
@@ -59,7 +59,7 @@ packer {
   required_plugins {
     crusoe = {
       version = ">= 1.0.0"
-      source  = "github.com/crusoecloud/crusoe"
+      source  = "github.com/modal-labs/crusoe"
     }
   }
 }

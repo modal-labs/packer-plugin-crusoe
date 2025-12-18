@@ -69,6 +69,7 @@ type FlatConfig struct {
 	WinRMUseNTLM              *bool             `mapstructure:"winrm_use_ntlm" cty:"winrm_use_ntlm" hcl:"winrm_use_ntlm"`
 	AccessKeyID               *string           `mapstructure:"access_key_id" cty:"access_key_id" hcl:"access_key_id"`
 	SecretAccessKey           *string           `mapstructure:"secret_access_key" cty:"secret_access_key" hcl:"secret_access_key"`
+	ProjectID                 *string           `mapstructure:"project_id" cty:"project_id" hcl:"project_id"`
 	APIEndpoint               *string           `mapstructure:"api_endpoint" cty:"api_endpoint" hcl:"api_endpoint"`
 	Location                  *string           `mapstructure:"location" cty:"location" hcl:"location"`
 	InstanceType              *string           `mapstructure:"instance_type" cty:"instance_type" hcl:"instance_type"`
@@ -156,6 +157,7 @@ func (*FlatConfig) HCL2Spec() map[string]hcldec.Spec {
 		"winrm_use_ntlm":               &hcldec.AttrSpec{Name: "winrm_use_ntlm", Type: cty.Bool, Required: false},
 		"access_key_id":                &hcldec.AttrSpec{Name: "access_key_id", Type: cty.String, Required: false},
 		"secret_access_key":            &hcldec.AttrSpec{Name: "secret_access_key", Type: cty.String, Required: false},
+		"project_id":                   &hcldec.AttrSpec{Name: "project_id", Type: cty.String, Required: false},
 		"api_endpoint":                 &hcldec.AttrSpec{Name: "api_endpoint", Type: cty.String, Required: false},
 		"location":                     &hcldec.AttrSpec{Name: "location", Type: cty.String, Required: false},
 		"instance_type":                &hcldec.AttrSpec{Name: "instance_type", Type: cty.String, Required: false},
