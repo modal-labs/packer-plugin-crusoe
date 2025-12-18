@@ -1,0 +1,139 @@
+---
+description: >
+    The crusoe Packer builder is able to create new images for use with
+    Crusoe Cloud. The builder takes a source image, runs any provisioning necessary
+    on the image after launching it, then snapshots it into a reusable image. This
+    reusable image can be then used as the foundation of new instances that are
+    launched within Crusoe Cloud.
+page_title: Crusoe - Builders
+nav_title: Crusoe
+---
+
+# Crusoe
+
+Type: `crusoe`
+
+The `crusoe` Packer builder is able to create new images for use with
+[Crusoe Cloud](https://crusoecloud.com). The builder takes a source image,
+runs any provisioning necessary on the image after launching it, then snapshots
+it into a reusable image. This reusable image can be then used as the
+foundation of new instances that are launched within Crusoe Cloud.
+
+The builder does *not* manage images. Once it creates an image, it is up to you
+to use it or delete it.
+
+## Configuration Reference
+
+### Required:
+
+-   `access_key_id` (string) - The Crusoe access key ID. Can also be specified via the `CRUSOE_ACCESS_KEY_ID` environment variable.
+
+-   `secret_access_key` (string) - The Crusoe secret access key. Can also be specified via the `CRUSOE_SECRET_ACCESS_KEY` environment variable.
+
+-   `location` (string) - The location where the instance will be created (e.g., "us-northcentral1-a").
+
+-   `instance_type` (string) - The type of instance to use for building the image (e.g., "a40.1x", "h100-80gb.1x").
+
+-   `image_id` (string) - The ID of the base image to use for creating the instance (e.g., "ubuntu22.04:latest").
+
+### Optional:
+
+-   `api_endpoint` (string) - The Crusoe API endpoint. Defaults to `https://api.crusoecloud.com`. Can also be specified via the `CRUSOE_API_ENDPOINT` environment variable.
+
+-   `network_id` (string) - The ID of the network to attach the instance to.
+
+-   `subnet_id` (string) - The ID of the subnet to attach the instance to.
+
+-   `ssh_key_ids` (array of string) - List of SSH key IDs to apply to this instance. If not specified and no SSH key is provided, a temporary SSH key pair will be created and used.
+
+-   `instance_name` (string) - The name to assign to the temporary instance. Defaults to `packer-{{timestamp}}`.
+
+-   `userdata` (string) - User data to pass to the instance.
+
+-   `tags` (array of string) - Tags to apply to the instance.
+
+-   `image_name` (string) - The name for the resulting custom image. Defaults to `packer-{{timestamp}}`.
+
+-   `image_description` (string) - The description for the resulting custom image. Defaults to `packer-{{timestamp}}`.
+
+-   `disk_size_gib` (int) - The size of the root disk in GiB. Defaults to 50.
+
+-   `state_timeout` (string) - A duration to wait for the instance to boot, or for an image to be created. Must be a string in [golang Duration-parsable format](https://golang.org/pkg/time/#ParseDuration), like "10m" or "30s". Defaults to `10m`.
+
+You may also adjust the [SSH communicator settings](https://www.packer.io/docs/communicators/ssh) to configure how Packer will log into Crusoe instances.
+
+## Example Usage
+
+```hcl
+variable "crusoe_access_key_id" {
+  type    = string
+  default = "${env("CRUSOE_ACCESS_KEY_ID")}"
+}
+
+variable "crusoe_secret_access_key" {
+  type      = string
+  default   = "${env("CRUSOE_SECRET_ACCESS_KEY")}"
+  sensitive = true
+}
+
+source "crusoe" "ubuntu" {
+  access_key_id     = "${var.crusoe_access_key_id}"
+  secret_access_key = "${var.crusoe_secret_access_key}"
+  
+  location      = "us-northcentral1-a"
+  instance_type = "a40.1x"
+  image_id      = "ubuntu22.04:latest"
+  
+  image_name        = "my-custom-ubuntu-image"
+  image_description = "Ubuntu 22.04 with custom configuration"
+  
+  disk_size_gib = 100
+  state_timeout = "15m"
+  
+  ssh_username = "root"
+}
+
+build {
+  sources = ["source.crusoe.ubuntu"]
+  
+  provisioner "shell" {
+    inline = [
+      "apt-get update",
+      "apt-get install -y nginx",
+      "systemctl enable nginx"
+    ]
+  }
+}
+```
+
+## Example with SSH Key
+
+```hcl
+source "crusoe" "ubuntu-with-key" {
+  access_key_id     = "${var.crusoe_access_key_id}"
+  secret_access_key = "${var.crusoe_secret_access_key}"
+  
+  location      = "us-northcentral1-a"
+  instance_type = "a40.1x"
+  image_id      = "ubuntu22.04:latest"
+  
+  ssh_key_ids = ["your-ssh-key-id"]
+  
+  image_name = "my-custom-image"
+  
+  ssh_username         = "root"
+  ssh_private_key_file = "~/.ssh/id_rsa"
+}
+
+build {
+  sources = ["source.crusoe.ubuntu-with-key"]
+}
+```
+
+## Notes
+
+- The plugin will automatically create a temporary SSH key pair if no SSH authentication is configured.
+- After provisioning, the instance is gracefully shut down before creating the image.
+- The temporary instance is automatically cleaned up after the image is created or if the build fails.
+- The source disk is snapshotted to create the custom image.
+
