@@ -20,32 +20,42 @@ func (s *stepCreateInstance) Run(ctx context.Context, state multistep.StateBag) 
 
 	ui.Say("Creating Crusoe instance...")
 
-	sshKeys := c.SSHKeyIDs
-	key, keyOK := state.GetOk("temp_ssh_key_id")
-	if keyOK {
-		sshKeys = append(sshKeys, key.(string))
+	// Get SSH public key - prefer temp key if available
+	var sshPublicKey string
+	if pubKey, ok := state.GetOk("temp_ssh_public_key"); ok {
+		sshPublicKey = pubKey.(string)
+	} else if c.Comm.SSHPublicKey != nil && len(c.Comm.SSHPublicKey) > 0 {
+		// Use the public key from the communicator config
+		sshPublicKey = string(c.Comm.SSHPublicKey)
+	} else {
+		// If no public key is available, return an error
+		err := fmt.Errorf("SSH public key is required. Please specify ssh_private_key_file (with corresponding .pub file) or let Packer create a temporary key pair")
+		state.Put("error", err)
+		ui.Error(err.Error())
+		return multistep.ActionHalt
 	}
 
-	// Build disk request
-	disks := []DiskCreateRequest{
+	// Configure network interface with static public IP
+	networkInterfaces := []NetworkInterface{
 		{
-			SizeGiB: c.DiskSizeGiB,
-			Type:    "persistent-ssd",
-			Mode:    "read-write",
+			IPs: []NetworkIP{
+				{
+					PublicIPv4: &PublicIPv4Config{
+						Type: "static",
+					},
+				},
+			},
 		},
 	}
 
 	instanceReq := &CreateInstanceRequest{
-		Name:      c.InstanceName,
-		Type:      c.InstanceType,
-		Location:  c.Location,
-		Image:     c.ImageID,
-		SSHKeys:   sshKeys,
-		UserData:  c.UserData,
-		Tags:      c.Tags,
-		NetworkID: c.NetworkID,
-		SubnetID:  c.SubnetID,
-		Disks:     disks,
+		Name:              c.InstanceName,
+		Type:              c.InstanceType,
+		Location:          c.Location,
+		Image:             c.ImageID,
+		SSHPublicKey:      sshPublicKey,
+		StartupScript:     c.UserData,
+		NetworkInterfaces: networkInterfaces,
 	}
 
 	instance, err := s.client.CreateInstance(instanceReq)
@@ -56,10 +66,16 @@ func (s *stepCreateInstance) Run(ctx context.Context, state multistep.StateBag) 
 		return multistep.ActionHalt
 	}
 
-	// Wait until instance is running
+	ui.Say(fmt.Sprintf("Instance %s creation initiated, waiting for completion...", instance.ID))
+
+	// Poll the VM operation until completion
+	// The instance creation returns a partial instance with just the ID
+	// We need to wait for it to actually be created before we can get its full details
+	// For now, we'll use a simple retry loop since the instance may not exist immediately
 	ui.Say(fmt.Sprintf("Waiting %ds for instance %s to become active...",
 		int(c.stateTimeout/time.Second), instance.ID))
 
+	// Wait with retry logic since the instance may take a moment to appear
 	if err = waitForInstanceState("running", instance.ID, s.client, c.stateTimeout); err != nil {
 		state.Put("error", err)
 		ui.Error(err.Error())

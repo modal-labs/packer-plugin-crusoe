@@ -3,6 +3,7 @@ package crusoe
 import (
 	"fmt"
 	"log"
+	"strings"
 	"time"
 )
 
@@ -24,6 +25,20 @@ func waitForInstanceState(state, instanceID string, client *Client, timeout time
 
 			instance, err := client.GetInstance(instanceID)
 			if err != nil {
+				// Handle 404 errors during the initial creation period
+				// The instance may not exist immediately after creation starts
+				if strings.Contains(err.Error(), "404") || strings.Contains(err.Error(), "not_found") {
+					log.Printf("Instance not found yet, will retry... (attempt: %d)", attempts)
+					time.Sleep(sleepDurationSeconds * time.Second)
+					// Verify we shouldn't exit
+					select {
+					case <-done:
+						return
+					default:
+						continue
+					}
+				}
+				// For other errors, fail immediately
 				result <- err
 				return
 			}

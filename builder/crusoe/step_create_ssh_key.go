@@ -84,6 +84,7 @@ func (s *stepCreateSSHKey) Run(_ context.Context, state multistep.StateBag) mult
 	s.SSHKeyID = key.ID
 
 	state.Put("temp_ssh_key_id", key.ID)
+	state.Put("temp_ssh_public_key", string(config.Comm.SSHPublicKey))
 
 	// If we're in debug mode, output the private key to the working directory.
 	if s.Debug {

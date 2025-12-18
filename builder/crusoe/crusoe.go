@@ -48,6 +48,9 @@ func (c *Client) doRequest(method, path string, body interface{}, queryParams ur
 		reqBody = bytes.NewBuffer(jsonData)
 	}
 
+	// Remove trailing slashes from path
+	path = strings.TrimRight(path, "/")
+
 	fullURL := fmt.Sprintf("%s%s", c.apiEndpoint, path)
 	if len(queryParams) > 0 {
 		fullURL += "?" + queryParams.Encode()
@@ -177,19 +180,38 @@ type DiskAttachment struct {
 
 // CreateInstanceRequest represents the request to create an instance
 type CreateInstanceRequest struct {
-	Name      string              `json:"name"`
-	Type      string              `json:"type"`
-	Location  string              `json:"location"`
-	Image     string              `json:"image"`
-	SSHKeys   []string            `json:"ssh_keys,omitempty"`
-	UserData  string              `json:"user_data,omitempty"`
-	Tags      []string            `json:"tags,omitempty"`
-	NetworkID string              `json:"network_id,omitempty"`
-	SubnetID  string              `json:"subnet_id,omitempty"`
-	Disks     []DiskCreateRequest `json:"disks,omitempty"`
+	Name                string               `json:"name"`
+	Type                string               `json:"type"`
+	Location            string               `json:"location"`
+	Image               string               `json:"image,omitempty"`
+	CustomImage         string               `json:"custom_image,omitempty"`
+	SSHPublicKey        string               `json:"ssh_public_key,omitempty"`
+	StartupScript       string               `json:"startup_script,omitempty"`
+	NetworkInterfaces   []NetworkInterface   `json:"network_interfaces,omitempty"`
+	HostChannelAdapters []HostChannelAdapter `json:"host_channel_adapters,omitempty"`
 }
 
-// DiskCreateRequest represents a disk creation request
+// NetworkInterface represents a network interface configuration
+type NetworkInterface struct {
+	IPs []NetworkIP `json:"ips,omitempty"`
+}
+
+// NetworkIP represents an IP configuration
+type NetworkIP struct {
+	PublicIPv4 *PublicIPv4Config `json:"public_ipv4,omitempty"`
+}
+
+// PublicIPv4Config represents public IPv4 configuration
+type PublicIPv4Config struct {
+	Type string `json:"type"` // "static" or "dynamic"
+}
+
+// HostChannelAdapter represents an InfiniBand partition configuration
+type HostChannelAdapter struct {
+	IBPartitionID string `json:"ib_partition_id"`
+}
+
+// DiskCreateRequest represents a disk creation request (kept for compatibility)
 type DiskCreateRequest struct {
 	SizeGiB int    `json:"size_gib"`
 	Type    string `json:"type"`
@@ -198,9 +220,137 @@ type DiskCreateRequest struct {
 
 // CreateInstanceResponse represents the response from creating an instance
 type CreateInstanceResponse struct {
-	Instance Instance `json:"instance"`
+	Operation InstanceOperation `json:"operation"`
 }
-https://api.crusoecloud.com/v1alpha5/projects/{project_id}/compute/vms/instances
+
+// InstanceOperation represents an asynchronous operation
+type InstanceOperation struct {
+	OperationID string            `json:"operation_id"`
+	State       string            `json:"state"`
+	Metadata    OperationMetadata `json:"metadata"`
+	Result      *json.RawMessage  `json:"result,omitempty"`
+	StartedAt   string            `json:"started_at"`
+	CompletedAt string            `json:"completed_at,omitempty"`
+}
+
+// OperationMetadata contains metadata about the operation
+type OperationMetadata struct {
+	OperationName string `json:"operation_name"`
+	ID            string `json:"id"` // The VM ID
+	Type          string `json:"type"`
+}
+
+// OperationStatus represents the status of an async operation
+type OperationStatus int
+
+const (
+	OperationStatusPending OperationStatus = iota
+	OperationStatusSucceeded
+	OperationStatusFailed
+)
+
+// GetVMOperationStatus queries the Crusoe API for the status of a VM operation
+func (c *Client) GetVMOperationStatus(operationID string) (OperationStatus, *InstanceOperation, error) {
+	path := fmt.Sprintf("/v1alpha5/projects/%s/compute/vms/instances/operations/%s", c.projectID, operationID)
+
+	respBody, err := c.doRequest("GET", path, nil, nil)
+	if err != nil {
+		return OperationStatusFailed, nil, err
+	}
+
+	var operation InstanceOperation
+	if err := json.Unmarshal(respBody, &operation); err != nil {
+		return OperationStatusFailed, nil, fmt.Errorf("unmarshal response: %w", err)
+	}
+
+	state := strings.ToUpper(operation.State)
+	switch state {
+	case "SUCCEEDED":
+		return OperationStatusSucceeded, &operation, nil
+	case "FAILED":
+		return OperationStatusFailed, &operation, nil
+	case "PENDING", "IN_PROGRESS":
+		return OperationStatusPending, &operation, nil
+	default:
+		return OperationStatusFailed, &operation, fmt.Errorf("unknown operation state: %s", state)
+	}
+}
+
+// PollVMOperationUntilComplete polls a VM operation until it completes (SUCCEEDED or FAILED)
+func (c *Client) PollVMOperationUntilComplete(operationID string, timeout time.Duration) (bool, *InstanceOperation, error) {
+	startTime := time.Now()
+
+	for time.Since(startTime) < timeout {
+		status, operation, err := c.GetVMOperationStatus(operationID)
+		if err != nil {
+			return false, nil, err
+		}
+
+		switch status {
+		case OperationStatusSucceeded:
+			return true, operation, nil
+		case OperationStatusFailed:
+			return false, operation, nil
+		case OperationStatusPending:
+			// Continue polling
+			time.Sleep(2 * time.Second)
+		}
+	}
+
+	return false, nil, fmt.Errorf("operation timed out after %v", timeout)
+}
+
+// GetImageOperationStatus queries the Crusoe API for the status of a custom image operation
+func (c *Client) GetImageOperationStatus(operationID string) (OperationStatus, *InstanceOperation, error) {
+	path := fmt.Sprintf("/v1alpha5/projects/%s/compute/images/operations/%s", c.projectID, operationID)
+
+	respBody, err := c.doRequest("GET", path, nil, nil)
+	if err != nil {
+		return OperationStatusFailed, nil, err
+	}
+
+	var operation InstanceOperation
+	if err := json.Unmarshal(respBody, &operation); err != nil {
+		return OperationStatusFailed, nil, fmt.Errorf("unmarshal response: %w", err)
+	}
+
+	state := strings.ToUpper(operation.State)
+	switch state {
+	case "SUCCEEDED":
+		return OperationStatusSucceeded, &operation, nil
+	case "FAILED":
+		return OperationStatusFailed, &operation, nil
+	case "PENDING", "IN_PROGRESS":
+		return OperationStatusPending, &operation, nil
+	default:
+		return OperationStatusFailed, &operation, fmt.Errorf("unknown operation state: %s", state)
+	}
+}
+
+// PollImageOperationUntilComplete polls a custom image operation until it completes (SUCCEEDED or FAILED)
+func (c *Client) PollImageOperationUntilComplete(operationID string, timeout time.Duration) (bool, *InstanceOperation, error) {
+	startTime := time.Now()
+
+	for time.Since(startTime) < timeout {
+		status, operation, err := c.GetImageOperationStatus(operationID)
+		if err != nil {
+			return false, nil, err
+		}
+
+		switch status {
+		case OperationStatusSucceeded:
+			return true, operation, nil
+		case OperationStatusFailed:
+			return false, operation, nil
+		case OperationStatusPending:
+			// Continue polling
+			time.Sleep(2 * time.Second)
+		}
+	}
+
+	return false, nil, fmt.Errorf("operation timed out after %v", timeout)
+}
+
 // CreateInstance creates a new VM instance
 func (c *Client) CreateInstance(req *CreateInstanceRequest) (*Instance, error) {
 	path := fmt.Sprintf("/v1alpha5/projects/%s/compute/vms/instances", c.projectID)
@@ -215,16 +365,40 @@ func (c *Client) CreateInstance(req *CreateInstanceRequest) (*Instance, error) {
 		return nil, fmt.Errorf("unmarshal response: %w", err)
 	}
 
-	return &resp.Instance, nil
+	// Validate that we got an instance ID and operation ID
+	if resp.Operation.Metadata.ID == "" {
+		return nil, fmt.Errorf("API did not return an instance ID. Response: %s", string(respBody))
+	}
+	if resp.Operation.OperationID == "" {
+		return nil, fmt.Errorf("API did not return an operation ID. Response: %s", string(respBody))
+	}
+
+	// Return an Instance with the ID and operation ID
+	instance := &Instance{
+		ID:       resp.Operation.Metadata.ID,
+		Name:     req.Name,
+		Type:     req.Type,
+		Location: req.Location,
+		State:    "PROVISIONING", // Initial state
+	}
+
+	// Store the operation ID in the instance for polling
+	// We'll add this field to the Instance struct
+	state := resp.Operation.State
+	_ = state // Use the operation state if needed
+
+	return instance, nil
 }
 
 // GetInstance retrieves an instance by ID
 func (c *Client) GetInstance(instanceID string) (*Instance, error) {
-	path := fmt.Sprintf("/v1alpha5/projects/%s/compute/vms/instances/%s", c.projectID, instanceID)
-	query := url.Values{}
-	query.Set("project_id", c.projectID)
+	if instanceID == "" {
+		return nil, fmt.Errorf("instance ID cannot be empty")
+	}
 
-	respBody, err := c.doRequest("GET", path, nil, query)
+	path := fmt.Sprintf("/v1alpha5/projects/%s/compute/vms/instances/%s", c.projectID, instanceID)
+
+	respBody, err := c.doRequest("GET", path, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -245,20 +419,16 @@ type UpdateInstanceRequest struct {
 // UpdateInstance updates an instance (e.g., to shut it down)
 func (c *Client) UpdateInstance(instanceID string, req *UpdateInstanceRequest) error {
 	path := fmt.Sprintf("/v1alpha5/projects/%s/compute/vms/instances/%s", c.projectID, instanceID)
-	query := url.Values{}
-	query.Set("project_id", c.projectID)
 
-	_, err := c.doRequest("PATCH", path, req, query)
+	_, err := c.doRequest("PATCH", path, req, nil)
 	return err
 }
 
 // DeleteInstance deletes an instance
 func (c *Client) DeleteInstance(instanceID string) error {
 	path := fmt.Sprintf("/v1alpha5/projects/%s/compute/vms/instances/%s", c.projectID, instanceID)
-	query := url.Values{}
-	query.Set("project_id", c.projectID)
 
-	_, err := c.doRequest("DELETE", path, nil, query)
+	_, err := c.doRequest("DELETE", path, nil, nil)
 	return err
 }
 
@@ -321,10 +491,8 @@ func (c *Client) GetCustomImage(imageID string) (*CustomImage, error) {
 // DeleteCustomImage deletes a custom image
 func (c *Client) DeleteCustomImage(imageID string) error {
 	path := fmt.Sprintf("/v1alpha5/compute/custom-images/%s", imageID)
-	query := url.Values{}
-	query.Set("project_id", c.projectID)
 
-	_, err := c.doRequest("DELETE", path, nil, query)
+	_, err := c.doRequest("DELETE", path, nil, nil)
 	return err
 }
 

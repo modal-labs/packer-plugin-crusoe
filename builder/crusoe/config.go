@@ -177,6 +177,28 @@ func (c *Config) Prepare(raws ...interface{}) error {
 		errs = packer.MultiErrorAppend(errs, es...)
 	}
 
+	// Load SSH public key if private key file is specified
+	if c.Comm.SSHPrivateKeyFile != "" && len(c.Comm.SSHPublicKey) == 0 {
+		pubKeyPath := c.Comm.SSHPrivateKeyFile + ".pub"
+
+		// Expand tilde in path
+		if pubKeyPath[:2] == "~/" {
+			homeDir, err := os.UserHomeDir()
+			if err == nil {
+				pubKeyPath = homeDir + pubKeyPath[1:]
+			}
+		}
+
+		if pubKeyData, err := os.ReadFile(pubKeyPath); err == nil {
+			c.Comm.SSHPublicKey = pubKeyData
+		} else {
+			// Public key file not found - that's okay if we're creating a temp key
+			if !c.createTempSSHPair {
+				errs = packer.MultiErrorAppend(errs, fmt.Errorf("SSH private key file specified but public key file not found at %s", pubKeyPath))
+			}
+		}
+	}
+
 	if errs != nil && len(errs.Errors) > 0 {
 		return errs
 	}
