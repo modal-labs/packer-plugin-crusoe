@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"sort"
@@ -68,6 +69,8 @@ func (c *Client) doRequest(method, path string, body interface{}, queryParams ur
 
 	req.Header.Set("Content-Type", "application/json")
 
+	log.Printf("[DEBUG] API Request: %s %s", method, req.URL.String())
+	
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("execute request: %w", err)
@@ -78,6 +81,8 @@ func (c *Client) doRequest(method, path string, body interface{}, queryParams ur
 	if err != nil {
 		return nil, fmt.Errorf("read response body: %w", err)
 	}
+
+	log.Printf("[DEBUG] API Response: status=%d, body=%s", resp.StatusCode, string(respBody))
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("API request failed with status %d: %s (URL: %s %s)", resp.StatusCode, string(respBody), method, req.URL.String())
@@ -252,11 +257,13 @@ const (
 // GetVMOperationStatus queries the Crusoe API for the status of a VM operation
 func (c *Client) GetVMOperationStatus(operationID string) (OperationStatus, *InstanceOperation, error) {
 	path := fmt.Sprintf("/v1alpha5/projects/%s/compute/vms/instances/operations/%s", c.projectID, operationID)
-
+	
 	respBody, err := c.doRequest("GET", path, nil, nil)
 	if err != nil {
 		return OperationStatusFailed, nil, err
 	}
+
+	log.Printf("[DEBUG] GetVMOperationStatus response: %s", string(respBody))
 
 	var operation InstanceOperation
 	if err := json.Unmarshal(respBody, &operation); err != nil {
@@ -264,6 +271,8 @@ func (c *Client) GetVMOperationStatus(operationID string) (OperationStatus, *Ins
 	}
 
 	state := strings.ToUpper(operation.State)
+	log.Printf("[DEBUG] Operation %s state: %s", operationID, state)
+	
 	switch state {
 	case "SUCCEEDED":
 		return OperationStatusSucceeded, &operation, nil
@@ -351,43 +360,33 @@ func (c *Client) PollImageOperationUntilComplete(operationID string, timeout tim
 	return false, nil, fmt.Errorf("operation timed out after %v", timeout)
 }
 
-// CreateInstance creates a new VM instance
-func (c *Client) CreateInstance(req *CreateInstanceRequest) (*Instance, error) {
+// CreateInstance creates a new VM instance and returns the instance ID and operation ID
+func (c *Client) CreateInstance(req *CreateInstanceRequest) (string, string, error) {
 	path := fmt.Sprintf("/v1alpha5/projects/%s/compute/vms/instances", c.projectID)
 
 	respBody, err := c.doRequest("POST", path, req, nil)
 	if err != nil {
-		return nil, err
+		return "", "", err
 	}
+
+	log.Printf("[DEBUG] CreateInstance response: %s", string(respBody))
 
 	var resp CreateInstanceResponse
 	if err := json.Unmarshal(respBody, &resp); err != nil {
-		return nil, fmt.Errorf("unmarshal response: %w", err)
+		return "", "", fmt.Errorf("unmarshal response: %w", err)
 	}
 
 	// Validate that we got an instance ID and operation ID
 	if resp.Operation.Metadata.ID == "" {
-		return nil, fmt.Errorf("API did not return an instance ID. Response: %s", string(respBody))
+		return "", "", fmt.Errorf("API did not return an instance ID. Response: %s", string(respBody))
 	}
 	if resp.Operation.OperationID == "" {
-		return nil, fmt.Errorf("API did not return an operation ID. Response: %s", string(respBody))
+		return "", "", fmt.Errorf("API did not return an operation ID. Response: %s", string(respBody))
 	}
 
-	// Return an Instance with the ID and operation ID
-	instance := &Instance{
-		ID:       resp.Operation.Metadata.ID,
-		Name:     req.Name,
-		Type:     req.Type,
-		Location: req.Location,
-		State:    "PROVISIONING", // Initial state
-	}
+	log.Printf("[DEBUG] Created instance ID: %s, operation ID: %s", resp.Operation.Metadata.ID, resp.Operation.OperationID)
 
-	// Store the operation ID in the instance for polling
-	// We'll add this field to the Instance struct
-	state := resp.Operation.State
-	_ = state // Use the operation state if needed
-
-	return instance, nil
+	return resp.Operation.Metadata.ID, resp.Operation.OperationID, nil
 }
 
 // GetInstance retrieves an instance by ID

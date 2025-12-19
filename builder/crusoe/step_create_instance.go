@@ -58,7 +58,7 @@ func (s *stepCreateInstance) Run(ctx context.Context, state multistep.StateBag) 
 		NetworkInterfaces: networkInterfaces,
 	}
 
-	instance, err := s.client.CreateInstance(instanceReq)
+	instanceID, operationID, err := s.client.CreateInstance(instanceReq)
 	if err != nil {
 		errOut := fmt.Errorf("creating instance: %w", err)
 		state.Put("error", errOut)
@@ -66,24 +66,39 @@ func (s *stepCreateInstance) Run(ctx context.Context, state multistep.StateBag) 
 		return multistep.ActionHalt
 	}
 
-	ui.Say(fmt.Sprintf("Instance %s creation initiated, waiting for completion...", instance.ID))
+	ui.Say(fmt.Sprintf("Instance %s creation initiated with operation %s", instanceID, operationID))
 
-	// Poll the VM operation until completion
-	// The instance creation returns a partial instance with just the ID
-	// We need to wait for it to actually be created before we can get its full details
-	// For now, we'll use a simple retry loop since the instance may not exist immediately
+	// First, poll the operation endpoint until the operation completes
+	ui.Say(fmt.Sprintf("Polling operation %s...", operationID))
+	success, operation, err := s.client.PollVMOperationUntilComplete(operationID, c.stateTimeout)
+	if err != nil {
+		errOut := fmt.Errorf("polling operation: %w", err)
+		state.Put("error", errOut)
+		ui.Error(errOut.Error())
+		return multistep.ActionHalt
+	}
+	if !success {
+		errOut := fmt.Errorf("operation %s failed: state=%s", operationID, operation.State)
+		state.Put("error", errOut)
+		ui.Error(errOut.Error())
+		return multistep.ActionHalt
+	}
+
+	ui.Say(fmt.Sprintf("Operation %s completed successfully", operationID))
+
+	// Now poll the instance endpoint until the instance is running
 	ui.Say(fmt.Sprintf("Waiting %ds for instance %s to become active...",
-		int(c.stateTimeout/time.Second), instance.ID))
+		int(c.stateTimeout/time.Second), instanceID))
 
-	// Wait with retry logic since the instance may take a moment to appear
-	if err = waitForInstanceState("running", instance.ID, s.client, c.stateTimeout); err != nil {
+	if err = waitForInstanceState("STATE_RUNNING", instanceID, s.client, c.stateTimeout); err != nil {
 		state.Put("error", err)
 		ui.Error(err.Error())
 		return multistep.ActionHalt
 	}
 
 	// Get the updated instance with IP address
-	if instance, err = s.client.GetInstance(instance.ID); err != nil {
+	instance, err := s.client.GetInstance(instanceID)
+	if err != nil {
 		errOut := fmt.Errorf("getting instance: %w", err)
 		state.Put("error", errOut)
 		ui.Error(errOut.Error())
