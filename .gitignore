@@ -4,7 +4,6 @@
 *.dll
 *.so
 *.dylib
-packer-plugin-crusoe
 
 # Test binary, built with `go test -c`
 *.test

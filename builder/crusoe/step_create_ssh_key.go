@@ -13,7 +13,6 @@ import (
 
 	"github.com/hashicorp/packer-plugin-sdk/multistep"
 	"github.com/hashicorp/packer-plugin-sdk/packer"
-	"github.com/hashicorp/packer-plugin-sdk/uuid"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -26,10 +25,6 @@ var (
 type stepCreateSSHKey struct {
 	Debug        bool
 	DebugKeyPath string
-
-	client *Client
-
-	SSHKeyID string
 }
 
 func (s *stepCreateSSHKey) Run(_ context.Context, state multistep.StateBag) multistep.StepAction {
@@ -40,11 +35,11 @@ func (s *stepCreateSSHKey) Run(_ context.Context, state multistep.StateBag) mult
 		return multistep.ActionContinue
 	}
 
-	ui.Say("Creating temporary SSH key...")
+	ui.Say("Generating ephemeral SSH key pair...")
 
 	priv, err := rsa.GenerateKey(rand.Reader, rsaBits)
 	if err != nil {
-		errOut := fmt.Errorf("creating temporary SSH key: %w", err)
+		errOut := fmt.Errorf("generating ephemeral SSH key: %w", err)
 		state.Put("error", errOut)
 		ui.Error(err.Error())
 		return multistep.ActionHalt
@@ -58,7 +53,7 @@ func (s *stepCreateSSHKey) Run(_ context.Context, state multistep.StateBag) mult
 
 	pub, err := ssh.NewPublicKey(&priv.PublicKey)
 	if err != nil {
-		errOut := fmt.Errorf("creating temporary SSH key: %w", err)
+		errOut := fmt.Errorf("generating ephemeral SSH key: %w", err)
 		state.Put("error", errOut)
 		ui.Error(err.Error())
 		return multistep.ActionHalt
@@ -66,24 +61,8 @@ func (s *stepCreateSSHKey) Run(_ context.Context, state multistep.StateBag) mult
 	config.Comm.SSHPrivateKey = pem.EncodeToMemory(&privBlk)
 	config.Comm.SSHPublicKey = ssh.MarshalAuthorizedKey(pub)
 
-	name := fmt.Sprintf("packer-%s", uuid.TimeOrderedUUID())
-
-	sshKeyReq := &CreateSSHKeyRequest{
-		Name:      name,
-		PublicKey: string(config.Comm.SSHPublicKey),
-	}
-	key, err := s.client.CreateSSHKey(sshKeyReq)
-	if err != nil {
-		errOut := fmt.Errorf("creating temporary SSH key: %w", err)
-		state.Put("error", errOut)
-		ui.Error(errOut.Error())
-		return multistep.ActionHalt
-	}
-
-	s.SSHKeyID = key.ID
-
-	state.Put("temp_ssh_key_id", key.ID)
-	state.Put("temp_ssh_public_key", string(config.Comm.SSHPublicKey))
+	state.Put("ephemeral_ssh_key_pair", true)
+	state.Put("ephemeral_ssh_public_key", string(config.Comm.SSHPublicKey))
 
 	if s.Debug {
 		ui.Say(fmt.Sprintf("saving key for debug purposes: %s", s.DebugKeyPath))
@@ -111,15 +90,5 @@ func (s *stepCreateSSHKey) Run(_ context.Context, state multistep.StateBag) mult
 }
 
 func (s *stepCreateSSHKey) Cleanup(state multistep.StateBag) {
-	if s.SSHKeyID == "" {
-		return
-	}
-
-	ui := state.Get("ui").(packer.Ui)
-	ui.Say("Deleting temporary SSH key...")
-
-	err := s.client.DeleteSSHKey(s.SSHKeyID)
-	if err != nil {
-		ui.Error(fmt.Sprintf("deleting temporary SSH key (%s) - please delete the key manually: %s", s.SSHKeyID, err))
-	}
+	// Key is stored in-memory
 }

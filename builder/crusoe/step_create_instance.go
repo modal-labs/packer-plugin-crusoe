@@ -19,19 +19,6 @@ func (s *stepCreateInstance) Run(ctx context.Context, state multistep.StateBag) 
 
 	ui.Say("Creating Crusoe instance...")
 
-	var sshPublicKey string
-	if pubKey, ok := state.GetOk("temp_ssh_public_key"); ok {
-		sshPublicKey = pubKey.(string)
-	} else if c.Comm.SSHPublicKey != nil && len(c.Comm.SSHPublicKey) > 0 {
-		sshPublicKey = string(c.Comm.SSHPublicKey)
-	} else {
-		// If no public key is available, return an error
-		err := fmt.Errorf("SSH public key is required. Please specify ssh_private_key_file (with corresponding .pub file) or let Packer create a temporary key pair")
-		state.Put("error", err)
-		ui.Error(err.Error())
-		return multistep.ActionHalt
-	}
-
 	networkInterfaces := []NetworkInterface{
 		{
 			IPs: []NetworkIP{
@@ -49,9 +36,35 @@ func (s *stepCreateInstance) Run(ctx context.Context, state multistep.StateBag) 
 		Type:              c.InstanceType,
 		Location:          c.Location,
 		Image:             c.ImageID,
-		SSHPublicKey:      sshPublicKey,
-		StartupScript:     c.UserData,
 		NetworkInterfaces: networkInterfaces,
+	}
+
+	// Check if we're using an ephemeral SSH key pair
+	if ephemeralKey, ok := state.GetOk("ephemeral_ssh_key_pair"); ok && ephemeralKey.(bool) {
+		// Generate cloud-init script with the ephemeral public key
+		if pubKey, ok := state.GetOk("ephemeral_ssh_public_key"); ok {
+			sshPublicKey := pubKey.(string)
+			cloudInitScript := fmt.Sprintf("#!/bin/bash\nmkdir -p /root/.ssh\nchmod 700 /root/.ssh\necho '%s' >> /root/.ssh/authorized_keys\nchmod 600 /root/.ssh/authorized_keys", sshPublicKey)
+			instanceReq.StartupScript = cloudInitScript
+			ui.Say("Using ephemeral SSH key with cloud-init script")
+		} else {
+			err := fmt.Errorf("ephemeral SSH key pair flag set but no public key found in state")
+			state.Put("error", err)
+			ui.Error(err.Error())
+			return multistep.ActionHalt
+		}
+	} else if len(c.Comm.SSHPublicKey) > 0 {
+		// Use the provided SSH public key
+		instanceReq.SSHPublicKey = string(c.Comm.SSHPublicKey)
+	}
+
+	// If user provided custom userdata, append it to the startup script
+	if c.UserData != "" {
+		if instanceReq.StartupScript != "" {
+			instanceReq.StartupScript = instanceReq.StartupScript + "\n" + c.UserData
+		} else {
+			instanceReq.StartupScript = c.UserData
+		}
 	}
 
 	instanceID, operationID, err := s.client.CreateInstance(instanceReq)

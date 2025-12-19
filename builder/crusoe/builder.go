@@ -41,7 +41,6 @@ func (b *Builder) Run(ctx context.Context, ui packer.Ui, hook packer.Hook) (ret 
 
 	steps := []multistep.Step{
 		&stepCreateSSHKey{
-			client:       client,
 			Debug:        b.config.PackerDebug,
 			DebugKeyPath: fmt.Sprintf("crusoe_%s.pem", b.config.PackerBuildName),
 		},
