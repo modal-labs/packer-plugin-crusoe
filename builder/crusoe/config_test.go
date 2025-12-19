@@ -191,3 +191,52 @@ func TestConfigPrepare_StateTimeout(t *testing.T) {
 		})
 	}
 }
+
+func TestConfigPrepare_ImageNameLength(t *testing.T) {
+	tests := []struct {
+		name      string
+		imageName string
+		wantErr   bool
+	}{
+		{
+			name:      "valid image name",
+			imageName: "my-custom-image",
+			wantErr:   false,
+		},
+		{
+			name:      "image name with 49 characters",
+			imageName: "1234567890123456789012345678901234567890123456789",
+			wantErr:   false,
+		},
+		{
+			name:      "image name with 50 characters",
+			imageName: "12345678901234567890123456789012345678901234567890",
+			wantErr:   true,
+		},
+		{
+			name:      "image name with 51 characters",
+			imageName: "123456789012345678901234567890123456789012345678901",
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := map[string]interface{}{
+				"access_key_id":     "test-access",
+				"secret_access_key": "test-secret",
+				"location":          "us-northcentral1-a",
+				"instance_type":     "a40.1x",
+				"image_id":          "ubuntu22.04:latest",
+				"image_name":        tt.imageName,
+				"ssh_username":      "root",
+			}
+
+			var c Config
+			err := c.Prepare(config)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Config.Prepare() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

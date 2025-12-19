@@ -291,6 +291,8 @@ const (
 	OperationStatusFailed
 )
 
+const PollInterval = 8 * time.Second
+
 // GetVMOperationStatus queries the Crusoe API for the status of a VM operation
 func (c *Client) GetVMOperationStatus(operationID string) (OperationStatus, *InstanceOperation, error) {
 	path := fmt.Sprintf("/v1alpha5/projects/%s/compute/vms/instances/operations/%s", c.projectID, operationID)
@@ -339,7 +341,7 @@ func (c *Client) PollVMOperationUntilComplete(operationID string, timeout time.D
 			return false, operation, nil
 		case OperationStatusPending:
 			// Continue polling
-			time.Sleep(2 * time.Second)
+			time.Sleep(PollInterval)
 		}
 	}
 
@@ -390,7 +392,7 @@ func (c *Client) PollImageOperationUntilComplete(operationID string, timeout tim
 			return false, operation, nil
 		case OperationStatusPending:
 			// Continue polling
-			time.Sleep(2 * time.Second)
+			time.Sleep(PollInterval)
 		}
 	}
 

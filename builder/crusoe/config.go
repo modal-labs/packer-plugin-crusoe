@@ -132,6 +132,11 @@ func (c *Config) Prepare(raws ...interface{}) error {
 		}
 	}
 
+	// Validate image name length
+	if len(c.ImageName) >= 50 {
+		errs = packer.MultiErrorAppend(errs, fmt.Errorf("image_name must be less than 50 characters, got %d characters", len(c.ImageName)))
+	}
+
 	if c.ImageDescription == "" {
 		def, err := interpolate.Render("packer-{{timestamp}}", nil)
 		if err != nil {
