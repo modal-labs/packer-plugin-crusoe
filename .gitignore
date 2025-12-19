@@ -5,7 +5,6 @@
 *.so
 *.dylib
 packer-plugin-crusoe
-packer-plugin-crusoe_v1.0.0_x5.0_linux_amd64
 
 # Test binary, built with `go test -c`
 *.test
