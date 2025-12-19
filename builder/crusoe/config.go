@@ -19,7 +19,6 @@ const (
 	defaultAPIEndpoint  = "https://api.crusoecloud.com"
 )
 
-// Config provides the config struct
 type Config struct {
 	common.PackerConfig `mapstructure:",squash"`
 	Comm                communicator.Config `mapstructure:",squash"`
@@ -64,7 +63,6 @@ type Config struct {
 	interCtx     interpolate.Context
 }
 
-// Prepare provides the config prepare functionality
 func (c *Config) Prepare(raws ...interface{}) error {
 	if err := config.Decode(c, &config.DecodeOpts{
 		Interpolate:        true,
@@ -80,7 +78,6 @@ func (c *Config) Prepare(raws ...interface{}) error {
 
 	var errs *packer.MultiError
 
-	// Validate authentication
 	if c.AccessKeyID == "" {
 		c.AccessKeyID = os.Getenv("CRUSOE_ACCESS_KEY_ID")
 		if c.AccessKeyID == "" {
@@ -109,7 +106,6 @@ func (c *Config) Prepare(raws ...interface{}) error {
 		}
 	}
 
-	// Validate required fields
 	if c.Location == "" {
 		errs = packer.MultiErrorAppend(errs, errors.New("location is required"))
 	}
@@ -122,7 +118,6 @@ func (c *Config) Prepare(raws ...interface{}) error {
 		errs = packer.MultiErrorAppend(errs, errors.New("image_id is required"))
 	}
 
-	// Set defaults for optional fields
 	if c.ImageName == "" {
 		def, err := interpolate.Render("packer-{{timestamp}}", nil)
 		if err != nil {
@@ -132,7 +127,6 @@ func (c *Config) Prepare(raws ...interface{}) error {
 		}
 	}
 
-	// Validate image name length
 	if len(c.ImageName) >= 50 {
 		errs = packer.MultiErrorAppend(errs, fmt.Errorf("image_name must be less than 50 characters, got %d characters", len(c.ImageName)))
 	}
@@ -155,19 +149,16 @@ func (c *Config) Prepare(raws ...interface{}) error {
 		}
 	}
 
-	// Default disk size
 	if c.DiskSizeGiB == 0 {
 		c.DiskSizeGiB = 50
 	}
 
-	// Determine if we need to create a temporary SSH key pair
 	if c.Comm.SSHPassword == "" && c.Comm.SSHPrivateKeyFile == "" {
 		c.createTempSSHPair = true
 	} else {
 		c.createTempSSHPair = false
 	}
 
-	// Parse state timeout
 	if c.RawStateTimeout == "" {
 		c.stateTimeout = defaultStateTimeout
 	} else {
@@ -182,11 +173,9 @@ func (c *Config) Prepare(raws ...interface{}) error {
 		errs = packer.MultiErrorAppend(errs, es...)
 	}
 
-	// Load SSH public key if private key file is specified
 	if c.Comm.SSHPrivateKeyFile != "" && len(c.Comm.SSHPublicKey) == 0 {
 		pubKeyPath := c.Comm.SSHPrivateKeyFile + ".pub"
 
-		// Expand tilde in path
 		if pubKeyPath[:2] == "~/" {
 			homeDir, err := os.UserHomeDir()
 			if err == nil {
@@ -196,11 +185,8 @@ func (c *Config) Prepare(raws ...interface{}) error {
 
 		if pubKeyData, err := os.ReadFile(pubKeyPath); err == nil {
 			c.Comm.SSHPublicKey = pubKeyData
-		} else {
-			// Public key file not found - that's okay if we're creating a temp key
-			if !c.createTempSSHPair {
-				errs = packer.MultiErrorAppend(errs, fmt.Errorf("SSH private key file specified but public key file not found at %s", pubKeyPath))
-			}
+		} else if !c.createTempSSHPair {
+			errs = packer.MultiErrorAppend(errs, fmt.Errorf("SSH private key file specified but public key file not found at %s", pubKeyPath))
 		}
 	}
 

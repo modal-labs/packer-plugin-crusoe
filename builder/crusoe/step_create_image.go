@@ -12,7 +12,6 @@ type stepCreateImage struct {
 	client *Client
 }
 
-// Run provides the step create image run functionality
 func (s *stepCreateImage) Run(ctx context.Context, state multistep.StateBag) multistep.StepAction {
 	c := state.Get("config").(*Config)
 	ui := state.Get("ui").(packer.Ui)
@@ -20,7 +19,6 @@ func (s *stepCreateImage) Run(ctx context.Context, state multistep.StateBag) mul
 
 	ui.Say("Creating custom image from instance disk...")
 
-	// Get the disk ID from the instance
 	if len(instance.Disks) == 0 {
 		errOut := fmt.Errorf("no disk attachments found on instance %s", instance.ID)
 		state.Put("error", errOut)
@@ -72,7 +70,6 @@ func (s *stepCreateImage) Run(ctx context.Context, state multistep.StateBag) mul
 	imageID := operation.Metadata.ID
 	ui.Say(fmt.Sprintf("Custom image created successfully (ID: %s)", imageID))
 
-	// Create a CustomImage object to store in state
 	image := &CustomImage{
 		ID:          imageID,
 		Name:        c.ImageName,
@@ -84,6 +81,5 @@ func (s *stepCreateImage) Run(ctx context.Context, state multistep.StateBag) mul
 	return multistep.ActionContinue
 }
 
-// Cleanup provides the step create image cleanup functionality
 func (s *stepCreateImage) Cleanup(state multistep.StateBag) {
 }

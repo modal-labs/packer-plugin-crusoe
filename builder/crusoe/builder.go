@@ -12,19 +12,15 @@ import (
 	"github.com/hashicorp/packer-plugin-sdk/packer"
 )
 
-// BuilderID is the unique ID for the builder
 const BuilderID = "packer.crusoe"
 
-// Builder provides the builder struct
 type Builder struct {
 	config Config
 	runner multistep.Runner
 }
 
-// ConfigSpec returns the HCL spec
 func (b *Builder) ConfigSpec() hcldec.ObjectSpec { return b.config.FlatMapstructure().HCL2Spec() }
 
-// Prepare provides the builder prepare function
 func (b *Builder) Prepare(raws ...interface{}) ([]string, []string, error) {
 	errs := b.config.Prepare(raws...)
 	if errs != nil {
@@ -33,7 +29,6 @@ func (b *Builder) Prepare(raws ...interface{}) ([]string, []string, error) {
 	return nil, nil, nil
 }
 
-// Run provides the builder run functionality
 func (b *Builder) Run(ctx context.Context, ui packer.Ui, hook packer.Hook) (ret packer.Artifact, err error) {
 	ui.Say("Running Crusoe builder...")
 

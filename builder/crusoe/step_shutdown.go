@@ -9,16 +9,12 @@ import (
 	"github.com/hashicorp/packer-plugin-sdk/packer"
 )
 
-// shutdown delays
-const (
-	ShutdownDelaySec = 10
-)
+const ShutdownDelaySec = 10
 
 type stepShutdown struct {
 	client *Client
 }
 
-// Run provides the step shutdown run functionality
 func (s *stepShutdown) Run(ctx context.Context, state multistep.StateBag) multistep.StepAction {
 	ui := state.Get("ui").(packer.Ui)
 	c := state.Get("config").(*Config)
@@ -47,7 +43,6 @@ func (s *stepShutdown) Run(ctx context.Context, state multistep.StateBag) multis
 		ui.Say("Using API to stop instance...")
 	}
 
-	// Use API to ensure instance is stopped
 	updateReq := &UpdateInstanceRequest{
 		Action: "STOP",
 	}
@@ -58,7 +53,6 @@ func (s *stepShutdown) Run(ctx context.Context, state multistep.StateBag) multis
 		return multistep.ActionHalt
 	}
 
-	// Wait for instance to be stopped
 	ui.Say(fmt.Sprintf("Waiting for instance %s to stop...", instance.ID))
 	if err := waitForInstanceState("STATE_SHUTOFF", instance.ID, s.client, c.stateTimeout); err != nil {
 		state.Put("error", err)
@@ -70,6 +64,5 @@ func (s *stepShutdown) Run(ctx context.Context, state multistep.StateBag) multis
 	return multistep.ActionContinue
 }
 
-// Cleanup provides the step shutdown cleanup functionality
 func (s *stepShutdown) Cleanup(state multistep.StateBag) {
 }

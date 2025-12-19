@@ -32,7 +32,6 @@ type stepCreateSSHKey struct {
 	SSHKeyID string
 }
 
-// Run provides the step create SSH key run functionality
 func (s *stepCreateSSHKey) Run(_ context.Context, state multistep.StateBag) multistep.StepAction {
 	ui := state.Get("ui").(packer.Ui)
 	config := state.Get("config").(*Config)
@@ -86,7 +85,6 @@ func (s *stepCreateSSHKey) Run(_ context.Context, state multistep.StateBag) mult
 	state.Put("temp_ssh_key_id", key.ID)
 	state.Put("temp_ssh_public_key", string(config.Comm.SSHPublicKey))
 
-	// If we're in debug mode, output the private key to the working directory.
 	if s.Debug {
 		ui.Say(fmt.Sprintf("saving key for debug purposes: %s", s.DebugKeyPath))
 		f, err := os.Create(s.DebugKeyPath)
@@ -95,7 +93,6 @@ func (s *stepCreateSSHKey) Run(_ context.Context, state multistep.StateBag) mult
 			return multistep.ActionHalt
 		}
 
-		// Write out the key
 		err = pem.Encode(f, &privBlk)
 		defer f.Close()
 		if err != nil {
@@ -103,7 +100,6 @@ func (s *stepCreateSSHKey) Run(_ context.Context, state multistep.StateBag) mult
 			return multistep.ActionHalt
 		}
 
-		// Chmod it so that it is SSH ready
 		if runtime.GOOS != "windows" {
 			if err := f.Chmod(sshKeyFileMode); err != nil {
 				state.Put("error", fmt.Errorf("setting permissions of debug key: %w", err))
@@ -114,7 +110,6 @@ func (s *stepCreateSSHKey) Run(_ context.Context, state multistep.StateBag) mult
 	return multistep.ActionContinue
 }
 
-// Cleanup provides the step create SSH key cleanup functionality
 func (s *stepCreateSSHKey) Cleanup(state multistep.StateBag) {
 	if s.SSHKeyID == "" {
 		return
