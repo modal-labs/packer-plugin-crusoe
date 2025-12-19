@@ -107,11 +107,30 @@ func (s *stepCreateInstance) Run(ctx context.Context, state multistep.StateBag) 
 
 	// Determine IP address to use for SSH
 	var instanceIP string
-	if instance.PublicIPv4 != nil && instance.PublicIPv4.Address != "" {
-		instanceIP = instance.PublicIPv4.Address
-	} else if instance.PrivateIPv4 != nil && instance.PrivateIPv4.Address != "" {
-		instanceIP = instance.PrivateIPv4.Address
-	} else {
+
+	// Parse IP addresses from network interfaces
+	if len(instance.NetworkInterfaces) > 0 && len(instance.NetworkInterfaces[0].IPs) > 0 {
+		ips := instance.NetworkInterfaces[0].IPs[0]
+		// Prefer public IP if available
+		if ips.PublicIPv4 != nil && ips.PublicIPv4.Address != "" {
+			instanceIP = ips.PublicIPv4.Address
+			ui.Say(fmt.Sprintf("Using public IP: %s", instanceIP))
+		} else if ips.PrivateIPv4 != nil && ips.PrivateIPv4.Address != "" {
+			instanceIP = ips.PrivateIPv4.Address
+			ui.Say(fmt.Sprintf("Using private IP: %s", instanceIP))
+		}
+	}
+
+	// Fallback to legacy fields if new structure is not available
+	if instanceIP == "" {
+		if instance.PublicIPv4 != nil && instance.PublicIPv4.Address != "" {
+			instanceIP = instance.PublicIPv4.Address
+		} else if instance.PrivateIPv4 != nil && instance.PrivateIPv4.Address != "" {
+			instanceIP = instance.PrivateIPv4.Address
+		}
+	}
+
+	if instanceIP == "" {
 		errOut := fmt.Errorf("no IP address found for instance %s", instance.ID)
 		state.Put("error", errOut)
 		ui.Error(errOut.Error())

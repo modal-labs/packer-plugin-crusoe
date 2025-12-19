@@ -70,7 +70,7 @@ func (c *Client) doRequest(method, path string, body interface{}, queryParams ur
 	req.Header.Set("Content-Type", "application/json")
 
 	log.Printf("[DEBUG] API Request: %s %s", method, req.URL.String())
-	
+
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("execute request: %w", err)
@@ -161,15 +161,43 @@ func (c *Client) canonicalizeQueryParams(params url.Values) string {
 
 // Instance represents a Crusoe VM instance
 type Instance struct {
-	ID              string           `json:"id"`
-	Name            string           `json:"name"`
-	Type            string           `json:"type"`
-	Location        string           `json:"location"`
-	State           string           `json:"state"`
-	PublicIPv4      *Address         `json:"public_ipv4,omitempty"`
-	PrivateIPv4     *Address         `json:"private_ipv4,omitempty"`
-	NetworkIDs      []string         `json:"network_ids,omitempty"`
-	DiskAttachments []DiskAttachment `json:"disk_attachments,omitempty"`
+	ID                string                     `json:"id"`
+	Name              string                     `json:"name"`
+	Type              string                     `json:"type"`
+	Location          string                     `json:"location"`
+	State             string                     `json:"state"`
+	NetworkInterfaces []InstanceNetworkInterface `json:"network_interfaces,omitempty"`
+	Disks             []DiskAttachment           `json:"disks,omitempty"`
+
+	// Deprecated: Use NetworkInterfaces instead
+	PublicIPv4  *Address `json:"public_ipv4,omitempty"`
+	PrivateIPv4 *Address `json:"private_ipv4,omitempty"`
+	NetworkIDs  []string `json:"network_ids,omitempty"`
+}
+
+// InstanceNetworkInterface represents a network interface in the API response
+type InstanceNetworkInterface struct {
+	ID              string              `json:"id"`
+	Name            string              `json:"name"`
+	Network         string              `json:"network"`
+	Subnet          string              `json:"subnet"`
+	InterfaceType   string              `json:"interface_type"`
+	MACAddress      string              `json:"mac_address"`
+	IPs             []InstanceNetworkIP `json:"ips"`
+	ExternalDNSName string              `json:"external_dns_name"`
+}
+
+// InstanceNetworkIP represents IP addresses in the API response
+type InstanceNetworkIP struct {
+	PrivateIPv4 *Address        `json:"private_ipv4,omitempty"`
+	PublicIPv4  *PublicIPv4Info `json:"public_ipv4,omitempty"`
+}
+
+// PublicIPv4Info represents public IPv4 address information
+type PublicIPv4Info struct {
+	Address string `json:"address"`
+	ID      string `json:"id"`
+	Type    string `json:"type"`
 }
 
 // Address represents an IP address
@@ -179,8 +207,17 @@ type Address struct {
 
 // DiskAttachment represents a disk attachment
 type DiskAttachment struct {
-	ID   string `json:"id"`
-	Mode string `json:"mode"`
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	Type           string `json:"type"`
+	Size           string `json:"size"`
+	Location       string `json:"location"`
+	BlockSize      int    `json:"block_size"`
+	CreatedAt      string `json:"created_at"`
+	UpdatedAt      string `json:"updated_at"`
+	SerialNumber   string `json:"serial_number"`
+	AttachmentType string `json:"attachment_type"` // "os" or "data"
+	Mode           string `json:"mode"`            // "read-write" or "read-only"
 }
 
 // CreateInstanceRequest represents the request to create an instance
@@ -257,7 +294,7 @@ const (
 // GetVMOperationStatus queries the Crusoe API for the status of a VM operation
 func (c *Client) GetVMOperationStatus(operationID string) (OperationStatus, *InstanceOperation, error) {
 	path := fmt.Sprintf("/v1alpha5/projects/%s/compute/vms/instances/operations/%s", c.projectID, operationID)
-	
+
 	respBody, err := c.doRequest("GET", path, nil, nil)
 	if err != nil {
 		return OperationStatusFailed, nil, err
@@ -272,7 +309,7 @@ func (c *Client) GetVMOperationStatus(operationID string) (OperationStatus, *Ins
 
 	state := strings.ToUpper(operation.State)
 	log.Printf("[DEBUG] Operation %s state: %s", operationID, state)
-	
+
 	switch state {
 	case "SUCCEEDED":
 		return OperationStatusSucceeded, &operation, nil
@@ -311,7 +348,7 @@ func (c *Client) PollVMOperationUntilComplete(operationID string, timeout time.D
 
 // GetImageOperationStatus queries the Crusoe API for the status of a custom image operation
 func (c *Client) GetImageOperationStatus(operationID string) (OperationStatus, *InstanceOperation, error) {
-	path := fmt.Sprintf("/v1alpha5/projects/%s/compute/images/operations/%s", c.projectID, operationID)
+	path := fmt.Sprintf("/v1alpha5/projects/%s/compute/custom-images/operations/%s", c.projectID, operationID)
 
 	respBody, err := c.doRequest("GET", path, nil, nil)
 	if err != nil {
@@ -412,13 +449,14 @@ func (c *Client) GetInstance(instanceID string) (*Instance, error) {
 
 // UpdateInstanceRequest represents the request to update an instance
 type UpdateInstanceRequest struct {
-	State string `json:"state,omitempty"`
+	Action string `json:"action"`
 }
 
 // UpdateInstance updates an instance (e.g., to shut it down)
 func (c *Client) UpdateInstance(instanceID string, req *UpdateInstanceRequest) error {
 	path := fmt.Sprintf("/v1alpha5/projects/%s/compute/vms/instances/%s", c.projectID, instanceID)
 
+	log.Printf("[DEBUG] UpdateInstance: %s with action: %s", instanceID, req.Action)
 	_, err := c.doRequest("PATCH", path, req, nil)
 	return err
 }
@@ -442,32 +480,32 @@ type CustomImage struct {
 
 // CreateCustomImageRequest represents the request to create a custom image
 type CreateCustomImageRequest struct {
+	DiskID      string `json:"DiskID"`
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
-	Location    string `json:"location"`
-	SourceDisk  string `json:"source_disk"`
+	Tags        string `json:"tags,omitempty"`
 }
 
 // CreateCustomImageResponse represents the response from creating a custom image
 type CreateCustomImageResponse struct {
-	Image CustomImage `json:"image"`
+	Operation InstanceOperation `json:"operation"`
 }
 
 // CreateCustomImage creates a custom image from a disk
-func (c *Client) CreateCustomImage(req *CreateCustomImageRequest) (*CustomImage, error) {
+func (c *Client) CreateCustomImage(req *CreateCustomImageRequest) (string, error) {
 	path := fmt.Sprintf("/v1alpha5/projects/%s/compute/custom-images", c.projectID)
 
 	respBody, err := c.doRequest("POST", path, req, nil)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	var resp CreateCustomImageResponse
 	if err := json.Unmarshal(respBody, &resp); err != nil {
-		return nil, fmt.Errorf("unmarshal response: %w", err)
+		return "", fmt.Errorf("unmarshal response: %w", err)
 	}
 
-	return &resp.Image, nil
+	return resp.Operation.OperationID, nil
 }
 
 // GetCustomImage retrieves a custom image by ID
@@ -489,7 +527,7 @@ func (c *Client) GetCustomImage(imageID string) (*CustomImage, error) {
 
 // DeleteCustomImage deletes a custom image
 func (c *Client) DeleteCustomImage(imageID string) error {
-	path := fmt.Sprintf("/v1alpha5/compute/custom-images/%s", imageID)
+	path := fmt.Sprintf("/v1alpha5/projects/%s/compute/custom-images/%s", c.projectID, imageID)
 
 	_, err := c.doRequest("DELETE", path, nil, nil)
 	return err

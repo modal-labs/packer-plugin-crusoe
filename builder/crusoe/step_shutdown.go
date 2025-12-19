@@ -49,7 +49,7 @@ func (s *stepShutdown) Run(ctx context.Context, state multistep.StateBag) multis
 
 	// Use API to ensure instance is stopped
 	updateReq := &UpdateInstanceRequest{
-		State: "stopped",
+		Action: "STOP",
 	}
 	if err := s.client.UpdateInstance(instance.ID, updateReq); err != nil {
 		errOut := fmt.Errorf("stopping instance: %w", err)
@@ -60,7 +60,7 @@ func (s *stepShutdown) Run(ctx context.Context, state multistep.StateBag) multis
 
 	// Wait for instance to be stopped
 	ui.Say(fmt.Sprintf("Waiting for instance %s to stop...", instance.ID))
-	if err := waitForInstanceState("stopped", instance.ID, s.client, c.stateTimeout); err != nil {
+	if err := waitForInstanceState("STATE_SHUTOFF", instance.ID, s.client, c.stateTimeout); err != nil {
 		state.Put("error", err)
 		ui.Error(err.Error())
 		return multistep.ActionHalt
