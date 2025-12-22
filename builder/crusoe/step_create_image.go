@@ -3,6 +3,7 @@ package crusoe
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/hashicorp/packer-plugin-sdk/multistep"
 	"github.com/hashicorp/packer-plugin-sdk/packer"
@@ -11,6 +12,8 @@ import (
 type stepCreateImage struct {
 	client *Client
 }
+
+const preImageCreationDelay = 30
 
 func (s *stepCreateImage) Run(ctx context.Context, state multistep.StateBag) multistep.StepAction {
 	c := state.Get("config").(*Config)
@@ -28,6 +31,14 @@ func (s *stepCreateImage) Run(ctx context.Context, state multistep.StateBag) mul
 
 	diskID := instance.Disks[0].ID
 	ui.Say(fmt.Sprintf("Found disk ID: %s", diskID))
+
+	// Ensure that the instance is STATE_SHUTOFF
+	if err := waitForInstanceState("STATE_SHUTOFF", instance.ID, s.client, c.instanceTimeout); err != nil {
+		state.Put("error ensuring instance is shut off:", err)
+		ui.Error(fmt.Sprintf("error ensuring instance is shut off: %s", err.Error()))
+		return multistep.ActionHalt
+	}
+	time.Sleep(preImageCreationDelay * time.Second)
 
 	imageReq := &CreateCustomImageRequest{
 		DiskID:      diskID,
