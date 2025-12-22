@@ -83,6 +83,8 @@ type FlatConfig struct {
 	ImageName                 *string           `mapstructure:"image_name" cty:"image_name" hcl:"image_name"`
 	ImageDescription          *string           `mapstructure:"image_description" cty:"image_description" hcl:"image_description"`
 	DiskSizeGiB               *int              `mapstructure:"disk_size_gib" cty:"disk_size_gib" hcl:"disk_size_gib"`
+	RawInstanceTimeout        *string           `mapstructure:"instance_timeout" cty:"instance_timeout" hcl:"instance_timeout"`
+	RawImageTimeout           *string           `mapstructure:"image_timeout" cty:"image_timeout" hcl:"image_timeout"`
 	RawStateTimeout           *string           `mapstructure:"state_timeout" cty:"state_timeout" hcl:"state_timeout"`
 }
 
@@ -171,6 +173,8 @@ func (*FlatConfig) HCL2Spec() map[string]hcldec.Spec {
 		"image_name":                   &hcldec.AttrSpec{Name: "image_name", Type: cty.String, Required: false},
 		"image_description":            &hcldec.AttrSpec{Name: "image_description", Type: cty.String, Required: false},
 		"disk_size_gib":                &hcldec.AttrSpec{Name: "disk_size_gib", Type: cty.Number, Required: false},
+		"instance_timeout":             &hcldec.AttrSpec{Name: "instance_timeout", Type: cty.String, Required: false},
+		"image_timeout":                &hcldec.AttrSpec{Name: "image_timeout", Type: cty.String, Required: false},
 		"state_timeout":                &hcldec.AttrSpec{Name: "state_timeout", Type: cty.String, Required: false},
 	}
 	return s

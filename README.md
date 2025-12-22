@@ -95,7 +95,9 @@ packer build image.pkr.hcl
 - `image_description` - Output image description
 - `instance_name` - Temporary instance name (default: "packer-{timestamp}")
 - `disk_size_gib` - Root disk size in GiB (default: 50)
-- `state_timeout` - Timeout for operations (default: "10m")
+- `instance_timeout` - Timeout for instance creation and operations (default: "20m")
+- `image_timeout` - Timeout for image creation (default: "45m")
+- `state_timeout` - **Deprecated**: Use `instance_timeout` instead
 - `ssh_key_id` - Pre-existing SSH key ID to use
 - `ssh_private_key_file` - Path to SSH private key file
 - `ssh_username` - SSH username (default: "root")

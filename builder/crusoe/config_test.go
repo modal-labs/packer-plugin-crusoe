@@ -131,8 +131,12 @@ func TestConfigPrepare_Defaults(t *testing.T) {
 		t.Errorf("DiskSizeGiB = %v, want 50", c.DiskSizeGiB)
 	}
 
-	if c.stateTimeout != defaultStateTimeout {
-		t.Errorf("stateTimeout = %v, want %v", c.stateTimeout, defaultStateTimeout)
+	if c.instanceTimeout != defaultInstanceTimeout {
+		t.Errorf("instanceTimeout = %v, want %v", c.instanceTimeout, defaultInstanceTimeout)
+	}
+
+	if c.imageTimeout != defaultImageTimeout {
+		t.Errorf("imageTimeout = %v, want %v", c.imageTimeout, defaultImageTimeout)
 	}
 
 	if c.ImageName == "" {
@@ -148,26 +152,44 @@ func TestConfigPrepare_Defaults(t *testing.T) {
 	}
 }
 
-func TestConfigPrepare_StateTimeout(t *testing.T) {
+func TestConfigPrepare_Timeouts(t *testing.T) {
 	tests := []struct {
-		name         string
-		stateTimeout string
-		wantErr      bool
+		name            string
+		instanceTimeout string
+		imageTimeout    string
+		stateTimeout    string // For backwards compatibility testing
+		wantErr         bool
 	}{
 		{
-			name:         "valid duration 10m",
-			stateTimeout: "10m",
+			name:            "valid instance timeout 15m",
+			instanceTimeout: "15m",
+			wantErr:         false,
+		},
+		{
+			name:         "valid image timeout 1h",
+			imageTimeout: "1h",
 			wantErr:      false,
 		},
 		{
-			name:         "valid duration 1h30m",
-			stateTimeout: "1h30m",
-			wantErr:      false,
+			name:            "valid both timeouts",
+			instanceTimeout: "20m",
+			imageTimeout:    "45m",
+			wantErr:         false,
 		},
 		{
-			name:         "invalid duration",
-			stateTimeout: "invalid",
+			name:            "invalid instance timeout",
+			instanceTimeout: "invalid",
+			wantErr:         true,
+		},
+		{
+			name:         "invalid image timeout",
+			imageTimeout: "invalid",
 			wantErr:      true,
+		},
+		{
+			name:         "backwards compatible state_timeout",
+			stateTimeout: "15m",
+			wantErr:      false,
 		},
 	}
 
@@ -179,8 +201,17 @@ func TestConfigPrepare_StateTimeout(t *testing.T) {
 				"location":          "us-northcentral1-a",
 				"instance_type":     "a40.1x",
 				"image_id":          "ubuntu22.04:latest",
-				"state_timeout":     tt.stateTimeout,
 				"ssh_username":      "root",
+			}
+
+			if tt.instanceTimeout != "" {
+				config["instance_timeout"] = tt.instanceTimeout
+			}
+			if tt.imageTimeout != "" {
+				config["image_timeout"] = tt.imageTimeout
+			}
+			if tt.stateTimeout != "" {
+				config["state_timeout"] = tt.stateTimeout
 			}
 
 			var c Config

@@ -46,7 +46,7 @@ func (s *stepCreateImage) Run(ctx context.Context, state multistep.StateBag) mul
 	ui.Say(fmt.Sprintf("Custom image creation started (operation: %s)", operationID))
 	ui.Say("Polling for image creation operation to complete...")
 
-	success, operation, err := s.client.PollImageOperationUntilComplete(operationID, c.stateTimeout)
+	success, operation, err := s.client.PollImageOperationUntilComplete(operationID, c.imageTimeout)
 	if err != nil {
 		errOut := fmt.Errorf("polling image operation: %w", err)
 		state.Put("error", errOut)

@@ -15,8 +15,9 @@ import (
 )
 
 const (
-	defaultStateTimeout = 10 * time.Minute
-	defaultAPIEndpoint  = "https://api.crusoecloud.com"
+	defaultInstanceTimeout = 20 * time.Minute
+	defaultImageTimeout    = 45 * time.Minute
+	defaultAPIEndpoint     = "https://api.crusoecloud.com"
 )
 
 type Config struct {
@@ -55,12 +56,15 @@ type Config struct {
 	DiskSizeGiB int `mapstructure:"disk_size_gib"`
 
 	// Timeout settings
-	RawStateTimeout string `mapstructure:"state_timeout"`
+	RawInstanceTimeout string `mapstructure:"instance_timeout"`
+	RawImageTimeout    string `mapstructure:"image_timeout"`
+	RawStateTimeout    string `mapstructure:"state_timeout"` // Deprecated: use instance_timeout
 
 	createTempSSHPair bool
 
-	stateTimeout time.Duration
-	interCtx     interpolate.Context
+	instanceTimeout time.Duration
+	imageTimeout    time.Duration
+	interCtx        interpolate.Context
 }
 
 func (c *Config) Prepare(raws ...interface{}) error {
@@ -159,13 +163,32 @@ func (c *Config) Prepare(raws ...interface{}) error {
 		c.createTempSSHPair = false
 	}
 
-	if c.RawStateTimeout == "" {
-		c.stateTimeout = defaultStateTimeout
+	// Parse instance timeout
+	if c.RawInstanceTimeout == "" {
+		// Fall back to deprecated state_timeout for backwards compatibility
+		if c.RawStateTimeout != "" {
+			c.RawInstanceTimeout = c.RawStateTimeout
+		}
+	}
+
+	if c.RawInstanceTimeout == "" {
+		c.instanceTimeout = defaultInstanceTimeout
 	} else {
-		if stateTimeout, err := time.ParseDuration(c.RawStateTimeout); err == nil {
-			c.stateTimeout = stateTimeout
+		if instanceTimeout, err := time.ParseDuration(c.RawInstanceTimeout); err == nil {
+			c.instanceTimeout = instanceTimeout
 		} else {
-			errs = packer.MultiErrorAppend(errs, fmt.Errorf("unable to parse state timeout: %s", err))
+			errs = packer.MultiErrorAppend(errs, fmt.Errorf("unable to parse instance timeout: %s", err))
+		}
+	}
+
+	// Parse image timeout
+	if c.RawImageTimeout == "" {
+		c.imageTimeout = defaultImageTimeout
+	} else {
+		if imageTimeout, err := time.ParseDuration(c.RawImageTimeout); err == nil {
+			c.imageTimeout = imageTimeout
+		} else {
+			errs = packer.MultiErrorAppend(errs, fmt.Errorf("unable to parse image timeout: %s", err))
 		}
 	}
 

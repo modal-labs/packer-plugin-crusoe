@@ -33,6 +33,10 @@ source "crusoe" "ubuntu-with-key" {
   image_name        = "my-custom-image"
   image_description = "Custom image with SSH key"
   
+  # Timeout configuration (optional)
+  # instance_timeout = "20m"  # Default: 20 minutes for instance creation
+  # image_timeout    = "45m"  # Default: 45 minutes for image creation
+  
   ssh_username         = "root"
   ssh_private_key_file = "~/.ssh/id_rsa"
 }

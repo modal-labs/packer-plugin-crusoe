@@ -78,7 +78,7 @@ func (s *stepCreateInstance) Run(ctx context.Context, state multistep.StateBag) 
 	ui.Say(fmt.Sprintf("Instance %s creation initiated with operation %s", instanceID, operationID))
 
 	ui.Say(fmt.Sprintf("Polling operation %s...", operationID))
-	success, operation, err := s.client.PollVMOperationUntilComplete(operationID, c.stateTimeout)
+	success, operation, err := s.client.PollVMOperationUntilComplete(operationID, c.instanceTimeout)
 	if err != nil {
 		errOut := fmt.Errorf("polling operation: %w", err)
 		state.Put("error", errOut)
@@ -95,9 +95,9 @@ func (s *stepCreateInstance) Run(ctx context.Context, state multistep.StateBag) 
 	ui.Say(fmt.Sprintf("Operation %s completed successfully", operationID))
 
 	ui.Say(fmt.Sprintf("Waiting %ds for instance %s to become active...",
-		int(c.stateTimeout/time.Second), instanceID))
+		int(c.instanceTimeout/time.Second), instanceID))
 
-	if err = waitForInstanceState("STATE_RUNNING", instanceID, s.client, c.stateTimeout); err != nil {
+	if err = waitForInstanceState("STATE_RUNNING", instanceID, s.client, c.instanceTimeout); err != nil {
 		state.Put("error", err)
 		ui.Error(err.Error())
 		return multistep.ActionHalt
