@@ -40,7 +40,7 @@ type Config struct {
 	SubnetID  string `mapstructure:"subnet_id"`
 
 	// SSH configuration
-	SSHKeyIDs []string `mapstructure:"ssh_key_ids"`
+	SSHKeyID string `mapstructure:"ssh_key_id"`
 
 	// Instance settings
 	InstanceName string   `mapstructure:"instance_name"`

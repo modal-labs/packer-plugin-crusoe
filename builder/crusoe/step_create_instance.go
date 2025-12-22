@@ -46,6 +46,7 @@ func (s *stepCreateInstance) Run(ctx context.Context, state multistep.StateBag) 
 			sshPublicKey := pubKey.(string)
 			cloudInitScript := fmt.Sprintf("#!/bin/bash\nmkdir -p /root/.ssh\nchmod 700 /root/.ssh\necho '%s' >> /root/.ssh/authorized_keys\nchmod 600 /root/.ssh/authorized_keys", sshPublicKey)
 			instanceReq.StartupScript = cloudInitScript
+			instanceReq.SSHPublicKey = sshPublicKey
 			ui.Say("Using ephemeral SSH key with cloud-init script")
 		} else {
 			err := fmt.Errorf("ephemeral SSH key pair flag set but no public key found in state")
@@ -54,7 +55,6 @@ func (s *stepCreateInstance) Run(ctx context.Context, state multistep.StateBag) 
 			return multistep.ActionHalt
 		}
 	} else if len(c.Comm.SSHPublicKey) > 0 {
-		// Use the provided SSH public key
 		instanceReq.SSHPublicKey = string(c.Comm.SSHPublicKey)
 	}
 

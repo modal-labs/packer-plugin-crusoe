@@ -44,7 +44,7 @@ to use it or delete it.
 
 -   `subnet_id` (string) - The ID of the subnet to attach the instance to.
 
--   `ssh_key_ids` (array of string) - List of SSH key IDs to apply to this instance. If not specified and no SSH key is provided, a temporary SSH key pair will be created and used.
+-   `ssh_key_id` (string) - SSH key ID to apply to this instance. If not specified and no SSH key is provided, a temporary SSH key pair will be created and used.
 
 -   `instance_name` (string) - The name to assign to the temporary instance. Defaults to `packer-{{timestamp}}`.
 
@@ -117,7 +117,7 @@ source "crusoe" "ubuntu-with-key" {
   instance_type = "a40.1x"
   image_id      = "ubuntu22.04:latest"
   
-  ssh_key_ids = ["your-ssh-key-id"]
+  ssh_key_id = "your-ssh-key-id"
   
   image_name = "my-custom-image"
   

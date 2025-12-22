@@ -87,7 +87,7 @@ func TestConfigPrepare_Required(t *testing.T) {
 				"image_description": "Test image description",
 				"disk_size_gib":     100,
 				"state_timeout":     "15m",
-				"ssh_key_ids":       []string{"key-1", "key-2"},
+				"ssh_key_id":        "key-1",
 				"tags":              []string{"tag1", "tag2"},
 				"ssh_username":      "root",
 			},

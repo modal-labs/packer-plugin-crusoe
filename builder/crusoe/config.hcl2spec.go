@@ -76,7 +76,7 @@ type FlatConfig struct {
 	ImageID                   *string           `mapstructure:"image_id" cty:"image_id" hcl:"image_id"`
 	NetworkID                 *string           `mapstructure:"network_id" cty:"network_id" hcl:"network_id"`
 	SubnetID                  *string           `mapstructure:"subnet_id" cty:"subnet_id" hcl:"subnet_id"`
-	SSHKeyIDs                 []string          `mapstructure:"ssh_key_ids" cty:"ssh_key_ids" hcl:"ssh_key_ids"`
+	SSHKeyID                  string            `mapstructure:"ssh_key_id" cty:"ssh_key_id" hcl:"ssh_key_id"`
 	InstanceName              *string           `mapstructure:"instance_name" cty:"instance_name" hcl:"instance_name"`
 	UserData                  *string           `mapstructure:"userdata" cty:"userdata" hcl:"userdata"`
 	Tags                      []string          `mapstructure:"tags" cty:"tags" hcl:"tags"`
@@ -164,7 +164,7 @@ func (*FlatConfig) HCL2Spec() map[string]hcldec.Spec {
 		"image_id":                     &hcldec.AttrSpec{Name: "image_id", Type: cty.String, Required: false},
 		"network_id":                   &hcldec.AttrSpec{Name: "network_id", Type: cty.String, Required: false},
 		"subnet_id":                    &hcldec.AttrSpec{Name: "subnet_id", Type: cty.String, Required: false},
-		"ssh_key_ids":                  &hcldec.AttrSpec{Name: "ssh_key_ids", Type: cty.List(cty.String), Required: false},
+		"ssh_key_id":                   &hcldec.AttrSpec{Name: "ssh_key_id", Type: cty.String, Required: false},
 		"instance_name":                &hcldec.AttrSpec{Name: "instance_name", Type: cty.String, Required: false},
 		"userdata":                     &hcldec.AttrSpec{Name: "userdata", Type: cty.String, Required: false},
 		"tags":                         &hcldec.AttrSpec{Name: "tags", Type: cty.List(cty.String), Required: false},

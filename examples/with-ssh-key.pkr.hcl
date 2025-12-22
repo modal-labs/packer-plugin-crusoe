@@ -28,7 +28,7 @@ source "crusoe" "ubuntu-with-key" {
   image_id      = "ubuntu22.04:latest"
   
   # Use an existing SSH key
-  ssh_key_ids = ["your-ssh-key-id-here"]
+  ssh_key_ids = "your-ssh-key-id-here"
   
   image_name        = "my-custom-image"
   image_description = "Custom image with SSH key"

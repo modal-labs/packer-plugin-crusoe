@@ -40,6 +40,7 @@ func (c *Client) doRequest(method, path string, body interface{}, queryParams ur
 	var reqBody io.Reader
 	if body != nil {
 		jsonData, err := json.Marshal(body)
+		log.Printf("[DEBUG] request body: %s", string(jsonData))
 		if err != nil {
 			return nil, fmt.Errorf("marshal request body: %w", err)
 		}
@@ -505,7 +506,7 @@ type CreateSSHKeyResponse struct {
 }
 
 func (c *Client) CreateSSHKey(req *CreateSSHKeyRequest) (*SSHKey, error) {
-	respBody, err := c.doRequest("POST", "/users/ssh-keys", req, nil)
+	respBody, err := c.doRequest("POST", "/v1alpha5/users/ssh-keys", req, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -519,6 +520,6 @@ func (c *Client) CreateSSHKey(req *CreateSSHKeyRequest) (*SSHKey, error) {
 }
 
 func (c *Client) DeleteSSHKey(keyID string) error {
-	_, err := c.doRequest("DELETE", fmt.Sprintf("/users/ssh-keys/%s", keyID), nil, nil)
+	_, err := c.doRequest("DELETE", fmt.Sprintf("/v1alpha5/users/ssh-keys/%s", keyID), nil, nil)
 	return err
 }
