@@ -18,7 +18,7 @@ A [Packer](https://www.packer.io/) plugin that enables automated creation of cus
 # Build from source
 make build
 
-# Install to Packer plugins directory
+# Install to Packer plugins directory (typically '$HOME/.config/packer/plugins')
 make install
 ```
 
@@ -69,6 +69,7 @@ build {
 ```
 
 Build the image:
+
 ```bash
 export CRUSOE_ACCESS_KEY_ID="your-access-key"
 export CRUSOE_SECRET_ACCESS_KEY="your-secret-key"
@@ -102,7 +103,8 @@ packer build image.pkr.hcl
 - `ssh_private_key_file` - Path to SSH private key file
 - `ssh_username` - SSH username (default: "root")
 
-See [DOCUMENTATION.md](DOCUMENTATION.md) for detailed configuration options.
+For more information on how to configure the plugin, please read the
+documentation located in the [`docs/`](docs) directory.
 
 ## Development
 
@@ -133,7 +135,7 @@ make clean
 
 See the `examples/` and `build/` directories for more examples:
 - `examples/basic.pkr.hcl` - Simple single-region build
-- `build/with-ssh-key.pkr.hcl` - Multi-region build with custom SSH keys
+- `examples/with-ssh-key.pkr.hcl` - Multi-region build with custom SSH keys
 
 ## Requirements
 

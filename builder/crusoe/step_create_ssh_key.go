@@ -41,7 +41,7 @@ func (s *stepCreateSSHKey) Run(_ context.Context, state multistep.StateBag) mult
 	if err != nil {
 		errOut := fmt.Errorf("generating ephemeral SSH key: %w", err)
 		state.Put("error", errOut)
-		ui.Error(err.Error())
+		ui.Error(errOut.Error())
 		return multistep.ActionHalt
 	}
 
@@ -55,7 +55,7 @@ func (s *stepCreateSSHKey) Run(_ context.Context, state multistep.StateBag) mult
 	if err != nil {
 		errOut := fmt.Errorf("generating ephemeral SSH key: %w", err)
 		state.Put("error", errOut)
-		ui.Error(err.Error())
+		ui.Error(errOut.Error())
 		return multistep.ActionHalt
 	}
 	config.Comm.SSHPrivateKey = pem.EncodeToMemory(&privBlk)
@@ -71,9 +71,9 @@ func (s *stepCreateSSHKey) Run(_ context.Context, state multistep.StateBag) mult
 			state.Put("error", fmt.Errorf("saving debug key: %w", err))
 			return multistep.ActionHalt
 		}
+		defer f.Close()
 
 		err = pem.Encode(f, &privBlk)
-		defer f.Close()
 		if err != nil {
 			state.Put("error", fmt.Errorf("saving debug key: %w", err))
 			return multistep.ActionHalt

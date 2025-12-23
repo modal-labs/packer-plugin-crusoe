@@ -34,8 +34,9 @@ func (s *stepCreateImage) Run(ctx context.Context, state multistep.StateBag) mul
 
 	// Ensure that the instance is STATE_SHUTOFF
 	if err := waitForInstanceState("STATE_SHUTOFF", instance.ID, s.client, c.instanceTimeout); err != nil {
-		state.Put("error ensuring instance is shut off:", err)
-		ui.Error(fmt.Sprintf("error ensuring instance is shut off: %s", err.Error()))
+		errOut := fmt.Sprintf("error ensuring instance is shut off: %s", err.Error())
+		state.Put("error", errOut)
+		ui.Error(errOut)
 		return multistep.ActionHalt
 	}
 	time.Sleep(preImageCreationDelay * time.Second)
