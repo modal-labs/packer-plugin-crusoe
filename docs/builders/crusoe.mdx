@@ -30,6 +30,8 @@ to use it or delete it.
 
 -   `secret_access_key` (string) - The Crusoe secret access key. Can also be specified via the `CRUSOE_SECRET_ACCESS_KEY` environment variable.
 
+-   `project_id` (string) - The Crusoe project ID. Can also be specified via the `CRUSOE_PROJECT_ID` environment variable.
+
 -   `location` (string) - The location where the instance will be created (e.g., "us-northcentral1-a").
 
 -   `instance_type` (string) - The type of instance to use for building the image (e.g., "a40.1x", "h100-80gb.1x").
@@ -76,9 +78,15 @@ variable "crusoe_secret_access_key" {
   sensitive = true
 }
 
+variable "crusoe_project_id" {
+  type    = string
+  default = "${env("CRUSOE_PROJECT_ID")}"
+}
+
 source "crusoe" "ubuntu" {
   access_key_id     = "${var.crusoe_access_key_id}"
   secret_access_key = "${var.crusoe_secret_access_key}"
+  project_id        = "${var.crusoe_project_id}"
   
   location      = "us-northcentral1-a"
   instance_type = "a40.1x"
@@ -112,6 +120,7 @@ build {
 source "crusoe" "ubuntu-with-key" {
   access_key_id     = "${var.crusoe_access_key_id}"
   secret_access_key = "${var.crusoe_secret_access_key}"
+  project_id        = "${var.crusoe_project_id}"
   
   location      = "us-northcentral1-a"
   instance_type = "a40.1x"
