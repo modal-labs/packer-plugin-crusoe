@@ -303,6 +303,8 @@ func (c *Client) GetVMOperationStatus(operationID string) (OperationStatus, *Ins
 	case "SUCCEEDED":
 		return OperationStatusSucceeded, &operation, nil
 	case "FAILED":
+		log.Printf("[DEBUG] VM operation failed. Error: %s, ErrorMessage: %s, Result: %v",
+			operation.Error, operation.ErrorMessage, operation.Result)
 		return OperationStatusFailed, &operation, nil
 	case "PENDING", "IN_PROGRESS":
 		return OperationStatusPending, &operation, nil
