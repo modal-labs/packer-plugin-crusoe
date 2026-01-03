@@ -240,12 +240,29 @@ type CreateInstanceResponse struct {
 }
 
 type InstanceOperation struct {
-	OperationID string            `json:"operation_id"`
-	State       string            `json:"state"`
-	Metadata    OperationMetadata `json:"metadata"`
-	Result      *json.RawMessage  `json:"result,omitempty"`
-	StartedAt   string            `json:"started_at"`
-	CompletedAt string            `json:"completed_at,omitempty"`
+	OperationID  string            `json:"operation_id"`
+	State        string            `json:"state"`
+	Metadata     OperationMetadata `json:"metadata"`
+	Result       *json.RawMessage  `json:"result,omitempty"`
+	Error        string            `json:"error,omitempty"`
+	ErrorMessage string            `json:"error_message,omitempty"`
+	StartedAt    string            `json:"started_at"`
+	CompletedAt  string            `json:"completed_at,omitempty"`
+}
+
+// ErrorDetail returns a human-readable error message from the operation.
+// It checks multiple fields where error details might be present.
+func (op *InstanceOperation) ErrorDetail() string {
+	if op.ErrorMessage != "" {
+		return op.ErrorMessage
+	}
+	if op.Error != "" {
+		return op.Error
+	}
+	if op.Result != nil {
+		return string(*op.Result)
+	}
+	return ""
 }
 
 type OperationMetadata struct {
@@ -325,16 +342,22 @@ func (c *Client) GetImageOperationStatus(operationID string) (OperationStatus, *
 		return OperationStatusFailed, nil, err
 	}
 
+	log.Printf("[DEBUG] GetImageOperationStatus response: %s", string(respBody))
+
 	var operation InstanceOperation
 	if err := json.Unmarshal(respBody, &operation); err != nil {
 		return OperationStatusFailed, nil, fmt.Errorf("unmarshal response: %w", err)
 	}
 
 	state := strings.ToUpper(operation.State)
+	log.Printf("[DEBUG] Image operation %s state: %s", operationID, state)
+
 	switch state {
 	case "SUCCEEDED":
 		return OperationStatusSucceeded, &operation, nil
 	case "FAILED":
+		log.Printf("[DEBUG] Image operation failed. Error: %s, ErrorMessage: %s, Result: %v",
+			operation.Error, operation.ErrorMessage, operation.Result)
 		return OperationStatusFailed, &operation, nil
 	case "PENDING", "IN_PROGRESS":
 		return OperationStatusPending, &operation, nil

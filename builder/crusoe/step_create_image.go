@@ -68,7 +68,12 @@ func (s *stepCreateImage) Run(ctx context.Context, state multistep.StateBag) mul
 
 	if !success {
 		if operation != nil {
-			errOut := fmt.Errorf("image creation operation failed: %s", operation.State)
+			var errOut error
+			if detail := operation.ErrorDetail(); detail != "" {
+				errOut = fmt.Errorf("image creation operation failed (state=%s): %s", operation.State, detail)
+			} else {
+				errOut = fmt.Errorf("image creation operation failed (state=%s): no error details provided by API", operation.State)
+			}
 			state.Put("error", errOut)
 			ui.Error(errOut.Error())
 		} else {
