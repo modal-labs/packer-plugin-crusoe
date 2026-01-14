@@ -89,12 +89,12 @@ func (s *stepCreateInstance) Run(ctx context.Context, state multistep.StateBag) 
 		var errOut error
 		if operation != nil {
 			if detail := operation.ErrorDetail(); detail != "" {
-				errOut = fmt.Errorf("operation %s failed (state=%s): %s", operationID, operation.State, detail)
+				errOut = fmt.Errorf("instance creation operation %s failed (state=%s): %s", operationID, operation.State, detail)
 			} else {
-				errOut = fmt.Errorf("operation %s failed (state=%s): no error details provided by API", operationID, operation.State)
+				errOut = fmt.Errorf("instance creation operation %s failed (state=%s): no error details provided by API", operationID, operation.State)
 			}
 		} else {
-			errOut = fmt.Errorf("operation %s failed: timed out", operationID)
+			errOut = fmt.Errorf("instance creation operation %s failed: timed out", operationID)
 		}
 		state.Put("error", errOut)
 		ui.Error(errOut.Error())
