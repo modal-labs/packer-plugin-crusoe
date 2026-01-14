@@ -131,7 +131,7 @@ func (s *stepCreateInstance) Run(ctx context.Context, state multistep.StateBag) 
 				continue
 			}
 
-			lastErr = fmt.Errorf("all instance types out of stock (tried: %s)", strings.Join(triedTypes, ", "))
+			lastErr = fmt.Errorf("all attempted instance types are out of stock: tried %s", strings.Join(triedTypes, ", "))
 			state.Put("error", lastErr)
 			ui.Error(lastErr.Error())
 			return multistep.ActionHalt
@@ -156,7 +156,7 @@ func (s *stepCreateInstance) Run(ctx context.Context, state multistep.StateBag) 
 	}
 
 	if instanceID == "" {
-		lastErr = fmt.Errorf("no instance was created after trying all instance types: %s", strings.Join(triedTypes, ", "))
+		lastErr = fmt.Errorf("no instance was created after trying instance types: %s", strings.Join(triedTypes, ", "))
 		state.Put("error", lastErr)
 		ui.Error(lastErr.Error())
 		return multistep.ActionHalt
