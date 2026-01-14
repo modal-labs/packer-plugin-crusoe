@@ -32,9 +32,10 @@ type Config struct {
 	APIEndpoint     string `mapstructure:"api_endpoint"`
 
 	// Instance configuration
-	Location     string `mapstructure:"location"`
-	InstanceType string `mapstructure:"instance_type"`
-	ImageID      string `mapstructure:"image_id"`
+	Location      string   `mapstructure:"location"`
+	InstanceType  string   `mapstructure:"instance_type"`
+	InstanceTypes []string `mapstructure:"instance_types"` // List of instance types to try in order (fallback on out_of_stock)
+	ImageID       string   `mapstructure:"image_id"`
 
 	// Network configuration
 	NetworkID string `mapstructure:"network_id"`
@@ -114,8 +115,14 @@ func (c *Config) Prepare(raws ...interface{}) error {
 		errs = packer.MultiErrorAppend(errs, errors.New("location is required"))
 	}
 
-	if c.InstanceType == "" {
-		errs = packer.MultiErrorAppend(errs, errors.New("instance_type is required"))
+	// If instance_type is set but instance_types is not, use instance_type as the single entry in instance_types.
+	// If both are set, instance_types takes precedence
+	if len(c.InstanceTypes) == 0 && c.InstanceType != "" {
+		c.InstanceTypes = []string{c.InstanceType}
+	}
+
+	if len(c.InstanceTypes) == 0 {
+		errs = packer.MultiErrorAppend(errs, errors.New("instance_type or instance_types is required"))
 	}
 
 	if c.ImageID == "" {

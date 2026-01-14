@@ -306,7 +306,7 @@ func (c *Client) GetVMOperationStatus(operationID string) (OperationStatus, *Ins
 	case "PENDING", "IN_PROGRESS":
 		return OperationStatusPending, &operation, nil
 	case "FAILED":
-		return OperationStatusFailed, &operation, fmt.Errorf("VM operation %s failed: %s", operationID, operation.ErrorDetail())
+		return OperationStatusFailed, &operation, nil
 	default:
 		return OperationStatusFailed, &operation, fmt.Errorf("unknown operation state: %s", state)
 	}
@@ -359,7 +359,7 @@ func (c *Client) GetImageOperationStatus(operationID string) (OperationStatus, *
 	case "PENDING", "IN_PROGRESS":
 		return OperationStatusPending, &operation, nil
 	case "FAILED":
-		return OperationStatusFailed, &operation, fmt.Errorf("image creation operation %s failed: %s", operationID, operation.ErrorDetail())
+		return OperationStatusFailed, &operation, nil
 	default:
 		return OperationStatusFailed, &operation, fmt.Errorf("unknown operation state: %s", state)
 	}

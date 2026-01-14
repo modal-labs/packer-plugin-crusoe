@@ -21,23 +21,23 @@ variable "crusoe_secret_access_key" {
 source "crusoe" "ubuntu" {
   access_key_id     = "${var.crusoe_access_key_id}"
   secret_access_key = "${var.crusoe_secret_access_key}"
-  
+
   location      = "us-northcentral1-a"
   instance_type = "a40.1x"
   image_id      = "ubuntu22.04:latest"
-  
+
   image_name        = "my-custom-ubuntu-image"
   image_description = "Ubuntu 22.04 with custom configuration"
-  
+
   disk_size_gib = 100
   state_timeout = "15m"
-  
+
   ssh_username = "root"
 }
 
 build {
   sources = ["source.crusoe.ubuntu"]
-  
+
   provisioner "shell" {
     inline = [
       "apt-get update",
@@ -45,7 +45,7 @@ build {
       "systemctl enable nginx"
     ]
   }
-  
+
   provisioner "shell" {
     inline = [
       "echo 'Custom image created at' $(date) > /etc/image-build-info"
