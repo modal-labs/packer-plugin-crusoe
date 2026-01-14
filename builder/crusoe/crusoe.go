@@ -239,6 +239,7 @@ type CreateInstanceResponse struct {
 	Operation InstanceOperation `json:"operation"`
 }
 
+// Same schema is used for instance operations and custom image operations.
 type InstanceOperation struct {
 	OperationID string            `json:"operation_id"`
 	State       string            `json:"state"`
@@ -252,6 +253,23 @@ type OperationMetadata struct {
 	OperationName string `json:"operation_name"`
 	ID            string `json:"id"` // The VM ID
 	Type          string `json:"type"`
+}
+
+// ErrorDetail returns a human-readable error message from the operation.
+func (op *InstanceOperation) ErrorDetail() string {
+	if op.Result != nil {
+		var errDetail struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		}
+		if err := json.Unmarshal(*op.Result, &errDetail); err == nil {
+			if errDetail.Code != "" && errDetail.Message != "" {
+				return fmt.Sprintf("%s: %s", errDetail.Code, errDetail.Message)
+			}
+		}
+		return string(*op.Result)
+	}
+	return ""
 }
 
 type OperationStatus int
@@ -285,10 +303,10 @@ func (c *Client) GetVMOperationStatus(operationID string) (OperationStatus, *Ins
 	switch state {
 	case "SUCCEEDED":
 		return OperationStatusSucceeded, &operation, nil
-	case "FAILED":
-		return OperationStatusFailed, &operation, nil
 	case "PENDING", "IN_PROGRESS":
 		return OperationStatusPending, &operation, nil
+	case "FAILED":
+		return OperationStatusFailed, &operation, fmt.Errorf("VM operation %s failed: %s", operationID, operation.ErrorDetail())
 	default:
 		return OperationStatusFailed, &operation, fmt.Errorf("unknown operation state: %s", state)
 	}
@@ -325,19 +343,23 @@ func (c *Client) GetImageOperationStatus(operationID string) (OperationStatus, *
 		return OperationStatusFailed, nil, err
 	}
 
+	log.Printf("[DEBUG] GetImageOperationStatus response: %s", string(respBody))
+
 	var operation InstanceOperation
 	if err := json.Unmarshal(respBody, &operation); err != nil {
 		return OperationStatusFailed, nil, fmt.Errorf("unmarshal response: %w", err)
 	}
 
 	state := strings.ToUpper(operation.State)
+	log.Printf("[DEBUG] Image operation %s state: %s", operationID, state)
+
 	switch state {
 	case "SUCCEEDED":
 		return OperationStatusSucceeded, &operation, nil
-	case "FAILED":
-		return OperationStatusFailed, &operation, nil
 	case "PENDING", "IN_PROGRESS":
 		return OperationStatusPending, &operation, nil
+	case "FAILED":
+		return OperationStatusFailed, &operation, fmt.Errorf("image creation operation %s failed: %s", operationID, operation.ErrorDetail())
 	default:
 		return OperationStatusFailed, &operation, fmt.Errorf("unknown operation state: %s", state)
 	}
