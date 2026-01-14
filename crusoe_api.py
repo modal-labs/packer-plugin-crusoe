@@ -1,6 +1,7 @@
+#!/usr/bin/env python3
+
 from datetime import datetime, timezone
 import json
-import time
 import asyncio
 import base64
 import hashlib
@@ -94,36 +95,38 @@ class CrusoeAPI:
     async def poll_image_operation(self, operation_id: str) -> dict:
         while True:
             res = await self.request("GET", f"compute/custom-images/operations/{operation_id}")
-            print(res)
-            if res["state"] == "SUCCEEDED":
+            print(json.dumps(res, indent=2))
+            if res["state"] in ("SUCCEEDED", "FAILED"):
                 return res
-            elif res["state"] == "FAILED":
-                raise Exception(res["error"])
+            await asyncio.sleep(2)
+
+    async def poll_operation(self, operation_id: str) -> dict:
+        while True:
+            res = await self.request("GET", f"compute/vms/instances/operations/{operation_id}")
+            print(json.dumps(res, indent=2))
+            if res["state"] in ("SUCCEEDED", "FAILED"):
+                return res
             await asyncio.sleep(2)
 
 
 async def main():
+    import argparse
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    poll_op = subparsers.add_parser("poll-op", help="Poll a VM operation")
+    poll_op.add_argument("operation_id", type=str, help="Operation ID to poll")
+
+    poll_image_op = subparsers.add_parser("poll-image-op", help="Poll a custom image operation")
+    poll_image_op.add_argument("operation_id", type=str, help="Operation ID to poll")
+
+    args = parser.parse_args()
     api = CrusoeAPI()
 
-    req = {
-        "DiskID": "4e367cbd-d4c0-41e1-99cf-9d4906495db2",
-        "name": f"matt-test-packer-{time.monotonic()}"
-    }
-    # res = await api.request("POST", "compute/custom-images", req)
-    # print(res)
-    # operation_id = res['operation']["operation_id"]
-
-    # {'operation_id': '864b1fbd-b3e9-4101-b8dd-1ae34ebaf826', 'state': 'IN_PROGRESS', 'metadata': {'operation_name': 'CREATE', 'id': 'ec91fb70-6d98-4658-b10c-4b9e92f7f80c', 'type': 'vm', 'request': None}, 'result': None, 'started_at': '2025-12-19T18:08:10Z', 'completed_at': ''}
-    # .... then after some amount of time ....
-    #  {'operation_id': '864b1fbd-b3e9-4101-b8dd-1ae34ebaf826', 'state': 'SUCCEEDED', 'metadata': {'operation_name': 'CREATE', 'id': 'ec91fb70-6d98-4658-b10c-4b9e92f7f80c', 'type': 'vm', 'request': None}, 'result': {'id': 'ec91fb70-6d98-4658-b10c-4b9e92f7f80c', 'name': 'matt-test-packer-172032.808817302', 'description': '', 'tags': None, 'created_at': '2025-12-19T18:11:31Z', 'locations': None}, 'started_at': '2025-12-19T18:08:10Z', 'completed_at': '2025-12-19T18:11:31Z'}
-    # res = await api.poll_image_operation(operation_id)
-    # print(res)
-
-    res = await api.request("GET", "compute/vms/instances/a8a971dc-4116-451f-88f0-d8a18e2ee9d9")
-    print(json.dumps(res, indent=2))
-
-    res = await api.request("GET", "compute/custom-images")
-    print(json.dumps(res, indent=2))
+    if args.command == "poll-op":
+        await api.poll_operation(args.operation_id)
+    elif args.command == "poll-image-op":
+        await api.poll_image_operation(args.operation_id)
 
 
 if __name__ == "__main__":

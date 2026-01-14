@@ -240,26 +240,27 @@ type CreateInstanceResponse struct {
 }
 
 type InstanceOperation struct {
-	OperationID  string            `json:"operation_id"`
-	State        string            `json:"state"`
-	Metadata     OperationMetadata `json:"metadata"`
-	Result       *json.RawMessage  `json:"result,omitempty"`
-	Error        string            `json:"error,omitempty"`
-	ErrorMessage string            `json:"error_message,omitempty"`
-	StartedAt    string            `json:"started_at"`
-	CompletedAt  string            `json:"completed_at,omitempty"`
+	OperationID string            `json:"operation_id"`
+	State       string            `json:"state"`
+	Metadata    OperationMetadata `json:"metadata"`
+	Result      *json.RawMessage  `json:"result,omitempty"`
+	StartedAt   string            `json:"started_at"`
+	CompletedAt string            `json:"completed_at,omitempty"`
 }
 
 // ErrorDetail returns a human-readable error message from the operation.
 // It checks multiple fields where error details might be present.
 func (op *InstanceOperation) ErrorDetail() string {
-	if op.ErrorMessage != "" {
-		return op.ErrorMessage
-	}
-	if op.Error != "" {
-		return op.Error
-	}
 	if op.Result != nil {
+		var errDetail struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		}
+		if err := json.Unmarshal(*op.Result, &errDetail); err == nil {
+			if errDetail.Code != "" && errDetail.Message != "" {
+				return fmt.Sprintf("%s: %s", errDetail.Code, errDetail.Message)
+			}
+		}
 		return string(*op.Result)
 	}
 	return ""
@@ -303,8 +304,8 @@ func (c *Client) GetVMOperationStatus(operationID string) (OperationStatus, *Ins
 	case "SUCCEEDED":
 		return OperationStatusSucceeded, &operation, nil
 	case "FAILED":
-		log.Printf("[DEBUG] VM operation failed. Error: %s, ErrorMessage: %s, Result: %v",
-			operation.Error, operation.ErrorMessage, operation.Result)
+		log.Printf("[DEBUG] VM operation failed. Error detail: %s",
+			operation.ErrorDetail())
 		return OperationStatusFailed, &operation, nil
 	case "PENDING", "IN_PROGRESS":
 		return OperationStatusPending, &operation, nil
@@ -358,8 +359,8 @@ func (c *Client) GetImageOperationStatus(operationID string) (OperationStatus, *
 	case "SUCCEEDED":
 		return OperationStatusSucceeded, &operation, nil
 	case "FAILED":
-		log.Printf("[DEBUG] Image operation failed. Error: %s, ErrorMessage: %s, Result: %v",
-			operation.Error, operation.ErrorMessage, operation.Result)
+		log.Printf("[DEBUG] Image operation failed. Error detail: %s",
+			operation.ErrorDetail())
 		return OperationStatusFailed, &operation, nil
 	case "PENDING", "IN_PROGRESS":
 		return OperationStatusPending, &operation, nil
