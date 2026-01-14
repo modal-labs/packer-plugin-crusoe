@@ -73,10 +73,11 @@ type FlatConfig struct {
 	APIEndpoint               *string           `mapstructure:"api_endpoint" cty:"api_endpoint" hcl:"api_endpoint"`
 	Location                  *string           `mapstructure:"location" cty:"location" hcl:"location"`
 	InstanceType              *string           `mapstructure:"instance_type" cty:"instance_type" hcl:"instance_type"`
+	InstanceTypes             []string          `mapstructure:"instance_types" cty:"instance_types" hcl:"instance_types"`
 	ImageID                   *string           `mapstructure:"image_id" cty:"image_id" hcl:"image_id"`
 	NetworkID                 *string           `mapstructure:"network_id" cty:"network_id" hcl:"network_id"`
 	SubnetID                  *string           `mapstructure:"subnet_id" cty:"subnet_id" hcl:"subnet_id"`
-	SSHKeyID                  string            `mapstructure:"ssh_key_id" cty:"ssh_key_id" hcl:"ssh_key_id"`
+	SSHKeyID                  *string           `mapstructure:"ssh_key_id" cty:"ssh_key_id" hcl:"ssh_key_id"`
 	InstanceName              *string           `mapstructure:"instance_name" cty:"instance_name" hcl:"instance_name"`
 	UserData                  *string           `mapstructure:"userdata" cty:"userdata" hcl:"userdata"`
 	Tags                      []string          `mapstructure:"tags" cty:"tags" hcl:"tags"`
@@ -163,6 +164,7 @@ func (*FlatConfig) HCL2Spec() map[string]hcldec.Spec {
 		"api_endpoint":                 &hcldec.AttrSpec{Name: "api_endpoint", Type: cty.String, Required: false},
 		"location":                     &hcldec.AttrSpec{Name: "location", Type: cty.String, Required: false},
 		"instance_type":                &hcldec.AttrSpec{Name: "instance_type", Type: cty.String, Required: false},
+		"instance_types":               &hcldec.AttrSpec{Name: "instance_types", Type: cty.List(cty.String), Required: false},
 		"image_id":                     &hcldec.AttrSpec{Name: "image_id", Type: cty.String, Required: false},
 		"network_id":                   &hcldec.AttrSpec{Name: "network_id", Type: cty.String, Required: false},
 		"subnet_id":                    &hcldec.AttrSpec{Name: "subnet_id", Type: cty.String, Required: false},
