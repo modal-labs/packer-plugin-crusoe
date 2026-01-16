@@ -24,8 +24,10 @@ source "crusoe" "ubuntu-with-key" {
   secret_access_key = "${var.crusoe_secret_access_key}"
 
   location       = "us-east1-a"
-  instance_types = ["a40.1x", "c1a.32x"]
+  instance_types = ["a40.1x", "a100-80gb-sxm-ib.8x", "c1a.32x"]
   image_id       = "ubuntu22.04:latest"
+
+  api_call_retries = 3
 
   ssh_key_id = "global-worker"
 
