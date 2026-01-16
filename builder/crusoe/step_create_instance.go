@@ -106,7 +106,28 @@ func (s *stepCreateInstance) Run(ctx context.Context, state multistep.StateBag) 
 		}
 
 		var operationID string
-		instanceID, operationID, lastErr = s.client.CreateInstance(instanceReq)
+		var createErr error
+		retries := c.APICallRetries
+		if retries < 0 {
+			retries = 0
+		}
+
+		attempts := retries + 1
+		for attempt := 0; attempt < attempts; attempt++ {
+			if attempt > 0 {
+				ui.Say(fmt.Sprintf("Retrying create instance API call (attempt %d/%d)...", attempt+1, attempts))
+				time.Sleep(apiCallRetryBackoff)
+			}
+
+			instanceID, operationID, createErr = s.client.CreateInstance(instanceReq)
+			if createErr == nil {
+				break
+			}
+
+			ui.Say(fmt.Sprintf("Create instance API call failed (attempt %d/%d): %s", attempt+1, attempts, createErr))
+		}
+
+		lastErr = createErr
 		if lastErr != nil {
 			ui.Error(fmt.Sprintf("creating instance with type %s: %s", instanceType, lastErr))
 			state.Put("error", fmt.Errorf("creating instance: %w", lastErr))

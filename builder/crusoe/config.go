@@ -18,6 +18,7 @@ const (
 	defaultInstanceTimeout = 20 * time.Minute
 	defaultImageTimeout    = 45 * time.Minute
 	defaultAPIEndpoint     = "https://api.crusoecloud.com"
+	apiCallRetryBackoff    = 10 * time.Second
 )
 
 type Config struct {
@@ -60,6 +61,9 @@ type Config struct {
 	RawInstanceTimeout string `mapstructure:"instance_timeout"`
 	RawImageTimeout    string `mapstructure:"image_timeout"`
 	RawStateTimeout    string `mapstructure:"state_timeout"` // Deprecated: use instance_timeout
+
+	// Retry settings
+	APICallRetries int `mapstructure:"api_call_retries"`
 
 	createTempSSHPair bool
 

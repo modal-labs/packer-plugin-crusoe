@@ -87,6 +87,7 @@ type FlatConfig struct {
 	RawInstanceTimeout        *string           `mapstructure:"instance_timeout" cty:"instance_timeout" hcl:"instance_timeout"`
 	RawImageTimeout           *string           `mapstructure:"image_timeout" cty:"image_timeout" hcl:"image_timeout"`
 	RawStateTimeout           *string           `mapstructure:"state_timeout" cty:"state_timeout" hcl:"state_timeout"`
+	APICallRetries            *int              `mapstructure:"api_call_retries" cty:"api_call_retries" hcl:"api_call_retries"`
 }
 
 // FlatMapstructure returns a new FlatConfig.
@@ -178,6 +179,7 @@ func (*FlatConfig) HCL2Spec() map[string]hcldec.Spec {
 		"instance_timeout":             &hcldec.AttrSpec{Name: "instance_timeout", Type: cty.String, Required: false},
 		"image_timeout":                &hcldec.AttrSpec{Name: "image_timeout", Type: cty.String, Required: false},
 		"state_timeout":                &hcldec.AttrSpec{Name: "state_timeout", Type: cty.String, Required: false},
+		"api_call_retries":             &hcldec.AttrSpec{Name: "api_call_retries", Type: cty.Number, Required: false},
 	}
 	return s
 }
