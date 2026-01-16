@@ -47,7 +47,28 @@ func (s *stepCreateImage) Run(ctx context.Context, state multistep.StateBag) mul
 		Description: c.ImageDescription,
 	}
 
-	operationID, err := s.client.CreateCustomImage(imageReq)
+	retries := c.APICallRetries
+	if retries < 0 {
+		retries = 0
+	}
+
+	attempts := retries + 1
+	var operationID string
+	var err error
+	for attempt := 0; attempt < attempts; attempt++ {
+		if attempt > 0 {
+			ui.Say(fmt.Sprintf("Retrying create image snapshot API call (attempt %d/%d)...", attempt+1, attempts))
+			time.Sleep(apiCallRetryBackoff)
+		}
+
+		operationID, err = s.client.CreateCustomImage(imageReq)
+		if err == nil {
+			break
+		}
+
+		ui.Say(fmt.Sprintf("Create image snapshot API call failed (attempt %d/%d): %s", attempt+1, attempts, err))
+	}
+
 	if err != nil {
 		errOut := fmt.Errorf("creating custom image: %w", err)
 		state.Put("error", errOut)

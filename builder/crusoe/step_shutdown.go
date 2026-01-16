@@ -46,8 +46,30 @@ func (s *stepShutdown) Run(ctx context.Context, state multistep.StateBag) multis
 	updateReq := &UpdateInstanceRequest{
 		Action: "STOP",
 	}
-	if err := s.client.UpdateInstance(instance.ID, updateReq); err != nil {
-		errOut := fmt.Errorf("stopping instance: %w", err)
+
+	retries := c.APICallRetries
+	if retries < 0 {
+		retries = 0
+	}
+
+	attempts := retries + 1
+	var updateErr error
+	for attempt := 0; attempt < attempts; attempt++ {
+		if attempt > 0 {
+			ui.Say(fmt.Sprintf("Retrying power off instance API call (attempt %d/%d)...", attempt+1, attempts))
+			time.Sleep(apiCallRetryBackoff)
+		}
+
+		updateErr = s.client.UpdateInstance(instance.ID, updateReq)
+		if updateErr == nil {
+			break
+		}
+
+		ui.Say(fmt.Sprintf("Power off instance API call failed (attempt %d/%d): %s", attempt+1, attempts, updateErr))
+	}
+
+	if updateErr != nil {
+		errOut := fmt.Errorf("stopping instance: %w", updateErr)
 		state.Put("error", errOut)
 		ui.Error(errOut.Error())
 		return multistep.ActionHalt
