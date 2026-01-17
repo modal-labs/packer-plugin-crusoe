@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-4core
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -35,7 +35,7 @@ jobs:
 
   release:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-4core
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
       contents: write
