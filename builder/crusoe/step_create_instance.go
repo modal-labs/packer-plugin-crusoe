@@ -88,6 +88,7 @@ func (s *stepCreateInstance) Run(ctx context.Context, state multistep.StateBag) 
 		}
 	}
 
+	var createdInstance bool
 	var instanceID string
 	var lastErr error
 	var triedTypes []string
@@ -97,6 +98,7 @@ func (s *stepCreateInstance) Run(ctx context.Context, state multistep.StateBag) 
 	}
 
 	// Try each instance type in order, falling back on out_of_stock errors
+instanceTypeLoop:
 	for _, instanceType := range instanceTypes {
 		instanceReq.Type = instanceType
 		triedTypes = append(triedTypes, instanceType)
@@ -120,63 +122,53 @@ func (s *stepCreateInstance) Run(ctx context.Context, state multistep.StateBag) 
 			}
 
 			instanceID, operationID, createErr = s.client.CreateInstance(instanceReq)
-			if createErr == nil {
-				break
+			if createErr != nil {
+				ui.Say(fmt.Sprintf("Create instance API call failed %s", createErr))
+				continue // Retry.
 			}
 
-			ui.Say(fmt.Sprintf("Create instance API call failed (attempt %d/%d): %s", attempt+1, attempts, createErr))
-		}
+			ui.Say(fmt.Sprintf("Instance %s creation initiated with operation %s", instanceID, operationID))
 
-		lastErr = createErr
-		if lastErr != nil {
-			ui.Error(fmt.Sprintf("creating instance with type %s: %s", instanceType, lastErr))
-			state.Put("error", fmt.Errorf("creating instance: %w", lastErr))
-			return multistep.ActionHalt
-		}
+			ui.Say(fmt.Sprintf("Polling instance creation operation %s...", operationID))
+			success, operation, err := s.client.PollVMOperationUntilComplete(operationID, c.instanceTimeout)
 
-		ui.Say(fmt.Sprintf("Instance %s creation initiated with operation %s", instanceID, operationID))
-
-		ui.Say(fmt.Sprintf("Polling operation %s...", operationID))
-		success, operation, err := s.client.PollVMOperationUntilComplete(operationID, c.instanceTimeout)
-
-		if success {
-			ui.Say(fmt.Sprintf("Operation %s completed successfully", operationID))
-			break
-		}
-
-		if isOutOfStockError(operation) {
-			ui.Say(fmt.Sprintf("Instance type %s is out of stock", instanceType))
-			if len(triedTypes) < len(instanceTypes) {
-				ui.Say("Trying next instance type...")
-				instanceID = ""
-				continue
+			if success {
+				ui.Say(fmt.Sprintf("Instance creation operation %s completed successfully", operationID))
+				createdInstance = true
+				break instanceTypeLoop
 			}
 
-			lastErr = fmt.Errorf("all attempted instance types are out of stock: tried %s", strings.Join(triedTypes, ", "))
-			state.Put("error", lastErr)
-			ui.Error(lastErr.Error())
-			return multistep.ActionHalt
-		}
+			if isOutOfStockError(operation) {
+				ui.Say(fmt.Sprintf("Instance type %s is out of stock", instanceType))
+				if len(triedTypes) < len(instanceTypes) {
+					ui.Say("Trying next instance type...")
+					instanceID = ""
+					continue instanceTypeLoop
+				}
 
-		// Not an out of stock error.
-		if err != nil {
-			lastErr = fmt.Errorf("polling operation: %w", err)
-		} else if operation != nil {
-			if detail := operation.ErrorDetail(); detail != "" {
-				lastErr = fmt.Errorf("instance creation operation %s failed (state=%s): %s", operationID, operation.State, detail)
-			} else {
-				lastErr = fmt.Errorf("instance creation operation %s failed (state=%s): no error details provided by API", operationID, operation.State)
+			} else if operation != nil {
+				// Failed for another reason
+				var errMsg error
+				if detail := operation.ErrorDetail(); detail != "" {
+					errMsg = fmt.Errorf("instance creation operation %s failed (state=%s): %s", operationID, operation.State, detail)
+				} else {
+					errMsg = fmt.Errorf("instance creation operation %s failed (state=%s): no error details provided by API", operationID, operation.State)
+				}
+				ui.Error(errMsg.Error())
 			}
-		} else {
-			lastErr = fmt.Errorf("instance creation operation %s failed: timed out", operationID)
-		}
 
-		state.Put("error", lastErr)
-		ui.Error(lastErr.Error())
-		return multistep.ActionHalt
+			// Timeout or other transient error on the polling request itself.
+			if err != nil {
+				ui.Error(fmt.Sprintf("creating instance type %s: %s", instanceType, err))
+				state.Put("error", fmt.Errorf("creating instance: %w", err))
+				continue // Retry the same instance type (not out of stock).
+			}
+		}
+		ui.Say(fmt.Sprintf("Instance creation attempt %d/%d failed, trying next instance type...", attempts, attempts))
 	}
 
-	if instanceID == "" {
+	// All instance types out of stock/failed creation with retries.
+	if !createdInstance || instanceID == "" {
 		lastErr = fmt.Errorf("no instance was created after trying instance types: %s", strings.Join(triedTypes, ", "))
 		state.Put("error", lastErr)
 		ui.Error(lastErr.Error())

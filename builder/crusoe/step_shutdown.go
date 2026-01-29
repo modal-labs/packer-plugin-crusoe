@@ -53,37 +53,35 @@ func (s *stepShutdown) Run(ctx context.Context, state multistep.StateBag) multis
 	}
 
 	attempts := retries + 1
-	var updateErr error
+	var err error
 	for attempt := 0; attempt < attempts; attempt++ {
 		if attempt > 0 {
 			ui.Say(fmt.Sprintf("Retrying power off instance API call (attempt %d/%d)...", attempt+1, attempts))
 			time.Sleep(apiCallRetryBackoff)
 		}
 
-		updateErr = s.client.UpdateInstance(instance.ID, updateReq)
-		if updateErr == nil {
-			break
+		err = s.client.UpdateInstance(instance.ID, updateReq)
+		if err != nil {
+			ui.Say(fmt.Sprintf("Power off instance API call failed (attempt %d/%d): %s", attempt+1, attempts, err))
+			continue // Retry.
 		}
 
-		ui.Say(fmt.Sprintf("Power off instance API call failed (attempt %d/%d): %s", attempt+1, attempts, updateErr))
+		ui.Say(fmt.Sprintf("Waiting for instance %s to stop...", instance.ID))
+		if err := waitForInstanceState("STATE_SHUTOFF", instance.ID, s.client, c.instanceTimeout); err != nil {
+			state.Put("error", err)
+			ui.Error(err.Error())
+			continue // Retry.
+		}
+
+		ui.Say("Instance successfully stopped")
+		return multistep.ActionContinue
 	}
 
-	if updateErr != nil {
-		errOut := fmt.Errorf("stopping instance: %w", updateErr)
-		state.Put("error", errOut)
-		ui.Error(errOut.Error())
-		return multistep.ActionHalt
-	}
-
-	ui.Say(fmt.Sprintf("Waiting for instance %s to stop...", instance.ID))
-	if err := waitForInstanceState("STATE_SHUTOFF", instance.ID, s.client, c.instanceTimeout); err != nil {
-		state.Put("error", err)
-		ui.Error(err.Error())
-		return multistep.ActionHalt
-	}
-
-	ui.Say("Instance successfully stopped")
-	return multistep.ActionContinue
+	// All attempts failed.
+	errOut := fmt.Errorf("stopping instance: %w", err)
+	state.Put("error", errOut)
+	ui.Error(errOut.Error())
+	return multistep.ActionHalt
 }
 
 func (s *stepShutdown) Cleanup(state multistep.StateBag) {

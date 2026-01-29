@@ -62,61 +62,59 @@ func (s *stepCreateImage) Run(ctx context.Context, state multistep.StateBag) mul
 		}
 
 		operationID, err = s.client.CreateCustomImage(imageReq)
-		if err == nil {
-			break
+		if err != nil {
+			ui.Say(fmt.Sprintf("Create image snapshot API call failed (attempt %d/%d): %s", attempt+1, attempts, err))
+			continue // Retry.
 		}
 
-		ui.Say(fmt.Sprintf("Create image snapshot API call failed (attempt %d/%d): %s", attempt+1, attempts, err))
-	}
+		ui.Say(fmt.Sprintf("Custom image creation started (operation: %s)", operationID))
+		ui.Say("Polling for image creation operation to complete...")
 
-	if err != nil {
-		errOut := fmt.Errorf("creating custom image: %w", err)
-		state.Put("error", errOut)
-		ui.Error(errOut.Error())
-		return multistep.ActionHalt
-	}
+		success, operation, err := s.client.PollImageOperationUntilComplete(operationID, c.imageTimeout)
+		if err != nil {
+			errOut := fmt.Errorf("polling image operation: %w", err)
+			state.Put("error", errOut)
+			ui.Error(errOut.Error())
+			continue // Retry.
+		}
 
-	ui.Say(fmt.Sprintf("Custom image creation started (operation: %s)", operationID))
-	ui.Say("Polling for image creation operation to complete...")
-
-	success, operation, err := s.client.PollImageOperationUntilComplete(operationID, c.imageTimeout)
-	if err != nil {
-		errOut := fmt.Errorf("polling image operation: %w", err)
-		state.Put("error", errOut)
-		ui.Error(errOut.Error())
-		return multistep.ActionHalt
-	}
-
-	if !success {
-		if operation != nil {
-			var errOut error
-			if detail := operation.ErrorDetail(); detail != "" {
-				errOut = fmt.Errorf("image creation operation failed (state=%s): %s", operation.State, detail)
+		if !success {
+			if operation != nil {
+				var errOut error
+				if detail := operation.ErrorDetail(); detail != "" {
+					errOut = fmt.Errorf("image creation operation failed (state=%s): %s", operation.State, detail)
+				} else {
+					errOut = fmt.Errorf("image creation operation failed (state=%s): no error details provided by API", operation.State)
+				}
+				state.Put("error", errOut)
+				ui.Error(errOut.Error())
 			} else {
-				errOut = fmt.Errorf("image creation operation failed (state=%s): no error details provided by API", operation.State)
+				errOut := fmt.Errorf("image creation operation timed out")
+				state.Put("error", errOut)
+				ui.Error(errOut.Error())
 			}
-			state.Put("error", errOut)
-			ui.Error(errOut.Error())
-		} else {
-			errOut := fmt.Errorf("image creation operation timed out")
-			state.Put("error", errOut)
-			ui.Error(errOut.Error())
+			continue // Retry.
 		}
-		return multistep.ActionHalt
+
+		// Success.
+		imageID := operation.Metadata.ID
+		ui.Say(fmt.Sprintf("Custom image created successfully (ID: %s)", imageID))
+		image := &CustomImage{
+			ID:          imageID,
+			Name:        c.ImageName,
+			Description: c.ImageDescription,
+			Location:    c.Location,
+		}
+		state.Put("image", image)
+		return multistep.ActionContinue
 	}
 
-	imageID := operation.Metadata.ID
-	ui.Say(fmt.Sprintf("Custom image created successfully (ID: %s)", imageID))
+	// Halt if all retries failed.
+	errOut := fmt.Errorf("creating custom image: %w", err)
+	state.Put("error", errOut)
+	ui.Error(errOut.Error())
+	return multistep.ActionHalt
 
-	image := &CustomImage{
-		ID:          imageID,
-		Name:        c.ImageName,
-		Description: c.ImageDescription,
-		Location:    c.Location,
-	}
-
-	state.Put("image", image)
-	return multistep.ActionContinue
 }
 
 func (s *stepCreateImage) Cleanup(state multistep.StateBag) {
