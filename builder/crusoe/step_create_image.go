@@ -96,7 +96,6 @@ func (s *stepCreateImage) Run(ctx context.Context, state multistep.StateBag) mul
 			continue // Retry.
 		}
 
-		// Success.
 		imageID := operation.Metadata.ID
 		ui.Say(fmt.Sprintf("Custom image created successfully (ID: %s)", imageID))
 		image := &CustomImage{
@@ -110,7 +109,7 @@ func (s *stepCreateImage) Run(ctx context.Context, state multistep.StateBag) mul
 	}
 
 	// Halt if all retries failed.
-	errOut := fmt.Errorf("creating custom image: %w", err)
+	errOut := fmt.Errorf("Creating custom image: %w failed after %d attempts", err, attempts)
 	state.Put("error", errOut)
 	ui.Error(errOut.Error())
 	return multistep.ActionHalt
