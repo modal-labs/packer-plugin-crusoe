@@ -109,12 +109,7 @@ instanceTypeLoop:
 
 		var operationID string
 		var createErr error
-		retries := c.APICallRetries
-		if retries < 0 {
-			retries = 0
-		}
-
-		attempts := retries + 1
+		attempts := max(0, c.APICallRetries+1)
 		for attempt := 0; attempt < attempts; attempt++ {
 			if attempt > 0 {
 				ui.Say(fmt.Sprintf("Retrying create instance API call (attempt %d/%d)...", attempt+1, attempts))

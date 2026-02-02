@@ -47,12 +47,7 @@ func (s *stepCreateImage) Run(ctx context.Context, state multistep.StateBag) mul
 		Description: c.ImageDescription,
 	}
 
-	retries := c.APICallRetries
-	if retries < 0 {
-		retries = 0
-	}
-
-	attempts := retries + 1
+	attempts := max(0, c.APICallRetries+1)
 	var operationID string
 	var err error
 	for attempt := 0; attempt < attempts; attempt++ {

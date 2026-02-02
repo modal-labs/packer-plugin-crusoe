@@ -26,12 +26,7 @@ func (s *stepShutdown) Run(ctx context.Context, state multistep.StateBag) multis
 		Action: "STOP",
 	}
 
-	retries := c.APICallRetries
-	if retries < 0 {
-		retries = 0
-	}
-
-	attempts := retries + 1
+	attempts := max(0, c.APICallRetries+1)
 	var err error
 	for attempt := 0; attempt < attempts; attempt++ {
 		if attempt > 0 {
