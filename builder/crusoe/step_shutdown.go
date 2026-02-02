@@ -20,28 +20,7 @@ func (s *stepShutdown) Run(ctx context.Context, state multistep.StateBag) multis
 	c := state.Get("config").(*Config)
 	instance := state.Get("instance").(*Instance)
 
-	ui.Say("Performing graceful shutdown...")
-	time.Sleep(ShutdownDelaySec * time.Second)
-
-	comm := state.Get("communicator").(packer.Communicator)
-
-	cmd := &packer.RemoteCmd{
-		Command: "sudo shutdown -h now",
-	}
-
-	if err := comm.Start(ctx, cmd); err != nil {
-		state.Put("error", err)
-		ui.Error(err.Error())
-		return multistep.ActionHalt
-	}
-	cmd.Wait()
-
-	if cmd.ExitStatus() == packer.CmdDisconnect {
-		ui.Say("Instance successfully shutdown via SSH")
-		time.Sleep(ShutdownDelaySec * time.Second)
-	} else {
-		ui.Say("Using API to stop instance...")
-	}
+	ui.Say("Using API to stop instance...")
 
 	updateReq := &UpdateInstanceRequest{
 		Action: "STOP",
