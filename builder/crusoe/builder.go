@@ -55,7 +55,10 @@ func (b *Builder) Run(ctx context.Context, ui packer.Ui, hook packer.Hook) (ret 
 			Comm: &b.config.Comm,
 		},
 		&stepShutdown{client},
-		&stepCreateImage{client},
+	}
+
+	if !b.config.DisablePublish {
+		steps = append(steps, &stepCreateImage{client})
 	}
 
 	b.runner = commonsteps.NewRunner(steps, b.config.PackerConfig, ui)
@@ -71,6 +74,11 @@ func (b *Builder) Run(ctx context.Context, ui packer.Ui, hook packer.Hook) (ret 
 
 	if _, ok := state.GetOk(multistep.StateHalted); ok {
 		return nil, errors.New("build was halted")
+	}
+
+	if b.config.DisablePublish {
+		ui.Say("Publish step disabled; skipping custom image creation.")
+		return nil, nil
 	}
 
 	if _, ok := state.GetOk("image"); !ok {

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 import asyncio
 import base64
@@ -108,6 +108,27 @@ class CrusoeAPI:
                 return res
             await asyncio.sleep(2)
 
+    async def delete_old_images(self):
+        res = await self.request("GET", "compute/custom-images")
+        existing_images = res["items"]
+        # find images older than 1 week
+        old_images = [img for img in existing_images if datetime.fromisoformat(img["created_at"]) < datetime.now(timezone.utc) - timedelta(days=7)]
+
+        print(f"OLD IMAGES ({len(old_images)})")
+        for image in old_images:
+            print(image["name"])
+        
+        new_images = [img for img in existing_images if img not in old_images]
+        print(f"NEW IMAGES ({len(new_images)})")
+        for image in new_images:
+            print(image["name"])
+        
+        if  (x := input("Continue?")) and x.lower() == "y":
+            for image in old_images:
+                await self.request("DELETE", f"compute/custom-images/{image['id']}")
+                print("Deleted image", image["name"])
+                await asyncio.sleep(1)
+
 
 async def main():
     import argparse
@@ -120,6 +141,8 @@ async def main():
     poll_image_op = subparsers.add_parser("poll-image-op", help="Poll a custom image operation")
     poll_image_op.add_argument("operation_id", type=str, help="Operation ID to poll")
 
+    subparsers.add_parser("delete-old-images")
+
     args = parser.parse_args()
     api = CrusoeAPI()
 
@@ -127,6 +150,8 @@ async def main():
         await api.poll_operation(args.operation_id)
     elif args.command == "poll-image-op":
         await api.poll_image_operation(args.operation_id)
+    elif args.command == "delete-old-images":
+        await api.delete_old_images()
 
 
 if __name__ == "__main__":

@@ -53,6 +53,7 @@ type Config struct {
 	// Image settings
 	ImageName        string `mapstructure:"image_name"`
 	ImageDescription string `mapstructure:"image_description"`
+	DisablePublish   bool   `mapstructure:"disable_publish"`
 
 	// Disk settings
 	DiskSizeGiB int `mapstructure:"disk_size_gib"`
@@ -133,25 +134,28 @@ func (c *Config) Prepare(raws ...interface{}) error {
 		errs = packer.MultiErrorAppend(errs, errors.New("image_id is required"))
 	}
 
-	if c.ImageName == "" {
-		def, err := interpolate.Render("packer-{{timestamp}}", nil)
-		if err != nil {
-			errs = packer.MultiErrorAppend(errs, fmt.Errorf("unable to render image name: %s", err))
-		} else {
-			c.ImageName = def
+	// Image publish settings (can be disabled to skip creating a custom image)
+	if !c.DisablePublish {
+		if c.ImageName == "" {
+			def, err := interpolate.Render("packer-{{timestamp}}", nil)
+			if err != nil {
+				errs = packer.MultiErrorAppend(errs, fmt.Errorf("unable to render image name: %s", err))
+			} else {
+				c.ImageName = def
+			}
 		}
-	}
 
-	if len(c.ImageName) >= 50 {
-		errs = packer.MultiErrorAppend(errs, fmt.Errorf("image_name must be less than 50 characters, got %d characters", len(c.ImageName)))
-	}
+		if len(c.ImageName) >= 50 {
+			errs = packer.MultiErrorAppend(errs, fmt.Errorf("image_name must be less than 50 characters, got %d characters", len(c.ImageName)))
+		}
 
-	if c.ImageDescription == "" {
-		def, err := interpolate.Render("packer-{{timestamp}}", nil)
-		if err != nil {
-			errs = packer.MultiErrorAppend(errs, fmt.Errorf("unable to render image description: %s", err))
-		} else {
-			c.ImageDescription = def
+		if c.ImageDescription == "" {
+			def, err := interpolate.Render("packer-{{timestamp}}", nil)
+			if err != nil {
+				errs = packer.MultiErrorAppend(errs, fmt.Errorf("unable to render image description: %s", err))
+			} else {
+				c.ImageDescription = def
+			}
 		}
 	}
 
@@ -193,13 +197,15 @@ func (c *Config) Prepare(raws ...interface{}) error {
 	}
 
 	// Parse image timeout
-	if c.RawImageTimeout == "" {
-		c.imageTimeout = defaultImageTimeout
-	} else {
-		if imageTimeout, err := time.ParseDuration(c.RawImageTimeout); err == nil {
-			c.imageTimeout = imageTimeout
+	if !c.DisablePublish {
+		if c.RawImageTimeout == "" {
+			c.imageTimeout = defaultImageTimeout
 		} else {
-			errs = packer.MultiErrorAppend(errs, fmt.Errorf("unable to parse image timeout: %s", err))
+			if imageTimeout, err := time.ParseDuration(c.RawImageTimeout); err == nil {
+				c.imageTimeout = imageTimeout
+			} else {
+				errs = packer.MultiErrorAppend(errs, fmt.Errorf("unable to parse image timeout: %s", err))
+			}
 		}
 	}
 
