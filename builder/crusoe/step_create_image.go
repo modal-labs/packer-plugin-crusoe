@@ -65,29 +65,24 @@ func (s *stepCreateImage) Run(ctx context.Context, state multistep.StateBag) mul
 		ui.Say(fmt.Sprintf("Custom image creation started (operation: %s)", operationID))
 		ui.Say("Polling for image creation operation to complete...")
 
-		success, operation, err := s.client.PollImageOperationUntilComplete(operationID, c.imageTimeout)
-		if err != nil {
-			errOut := fmt.Errorf("polling image operation: %w", err)
-			state.Put("error", errOut)
-			ui.Error(errOut.Error())
+		success, operation, pollErr := s.client.PollImageOperationUntilComplete(operationID, c.imageTimeout)
+		if pollErr != nil {
+			err = fmt.Errorf("polling image operation: %w", pollErr)
+			ui.Error(err.Error())
 			continue // Retry.
 		}
 
 		if !success {
 			if operation != nil {
-				var errOut error
 				if detail := operation.ErrorDetail(); detail != "" {
-					errOut = fmt.Errorf("image creation operation failed (state=%s): %s", operation.State, detail)
+					err = fmt.Errorf("image creation operation failed (state=%s): %s", operation.State, detail)
 				} else {
-					errOut = fmt.Errorf("image creation operation failed (state=%s): no error details provided by API", operation.State)
+					err = fmt.Errorf("image creation operation failed (state=%s): no error details provided by API", operation.State)
 				}
-				state.Put("error", errOut)
-				ui.Error(errOut.Error())
 			} else {
-				errOut := fmt.Errorf("image creation operation timed out")
-				state.Put("error", errOut)
-				ui.Error(errOut.Error())
+				err = fmt.Errorf("image creation operation timed out")
 			}
+			ui.Error(err.Error())
 			continue // Retry.
 		}
 
@@ -104,7 +99,7 @@ func (s *stepCreateImage) Run(ctx context.Context, state multistep.StateBag) mul
 	}
 
 	// Halt if all retries failed.
-	errOut := fmt.Errorf("Creating custom image: %w failed after %d attempts", err, attempts)
+	errOut := fmt.Errorf("creating custom image failed after %d attempts: %w", attempts, err)
 	state.Put("error", errOut)
 	ui.Error(errOut.Error())
 	return multistep.ActionHalt

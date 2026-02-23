@@ -155,7 +155,6 @@ instanceTypeLoop:
 			// Timeout or other transient error on the polling request itself.
 			if err != nil {
 				ui.Error(fmt.Sprintf("creating instance type %s: %s", instanceType, err))
-				state.Put("error", fmt.Errorf("creating instance: %w", err))
 				continue // Retry the same instance type (not out of stock).
 			}
 		}
