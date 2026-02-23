@@ -57,7 +57,7 @@ func (b *Builder) Run(ctx context.Context, ui packer.Ui, hook packer.Hook) (ret 
 		&stepShutdown{client},
 	}
 
-	if !b.config.DisablePublish {
+	if !b.config.SkipPublish {
 		steps = append(steps, &stepCreateImage{client})
 	}
 
@@ -76,8 +76,8 @@ func (b *Builder) Run(ctx context.Context, ui packer.Ui, hook packer.Hook) (ret 
 		return nil, errors.New("build was halted")
 	}
 
-	if b.config.DisablePublish {
-		ui.Say("Publish step disabled; skipping custom image creation.")
+	if b.config.SkipPublish {
+		ui.Say("Publish step skipped; skipping custom image creation.")
 		return nil, nil
 	}
 

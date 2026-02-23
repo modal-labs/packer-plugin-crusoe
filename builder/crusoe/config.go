@@ -53,7 +53,7 @@ type Config struct {
 	// Image settings
 	ImageName        string `mapstructure:"image_name"`
 	ImageDescription string `mapstructure:"image_description"`
-	DisablePublish   bool   `mapstructure:"disable_publish"`
+	SkipPublish   bool   `mapstructure:"skip_publish"`
 
 	// Disk settings
 	DiskSizeGiB int `mapstructure:"disk_size_gib"`
@@ -135,7 +135,7 @@ func (c *Config) Prepare(raws ...interface{}) error {
 	}
 
 	// Image publish settings (can be disabled to skip creating a custom image)
-	if !c.DisablePublish {
+	if !c.SkipPublish {
 		if c.ImageName == "" {
 			def, err := interpolate.Render("packer-{{timestamp}}", nil)
 			if err != nil {
@@ -197,7 +197,7 @@ func (c *Config) Prepare(raws ...interface{}) error {
 	}
 
 	// Parse image timeout
-	if !c.DisablePublish {
+	if !c.SkipPublish {
 		if c.RawImageTimeout == "" {
 			c.imageTimeout = defaultImageTimeout
 		} else {
