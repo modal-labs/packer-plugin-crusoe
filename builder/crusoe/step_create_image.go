@@ -99,7 +99,7 @@ func (s *stepCreateImage) Run(ctx context.Context, state multistep.StateBag) mul
 	}
 
 	// Halt if all retries failed.
-	errOut := fmt.Errorf("creating custom image after %d attempts: %w", attempts, err)
+	errOut := fmt.Errorf("creating custom image failed after %d attempts: %w", attempts, err)
 	state.Put("error", errOut)
 	ui.Error(errOut.Error())
 	return multistep.ActionHalt
