@@ -41,8 +41,8 @@ func (s *stepShutdown) Run(ctx context.Context, state multistep.StateBag) multis
 		}
 
 		ui.Say(fmt.Sprintf("Waiting for instance %s to stop...", instance.ID))
-		if err := waitForInstanceState("STATE_SHUTOFF", instance.ID, s.client, c.instanceTimeout); err != nil {
-			state.Put("error", err)
+		if waitErr := waitForInstanceState("STATE_SHUTOFF", instance.ID, s.client, c.instanceTimeout); waitErr != nil {
+			err = waitErr
 			ui.Error(err.Error())
 			continue // Retry.
 		}
