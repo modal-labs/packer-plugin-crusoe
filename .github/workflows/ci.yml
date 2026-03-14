@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Build
+        run: go build -o packer-plugin-crusoe
+
+      - name: Run tests
+        run: go test ./... -v
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: packer-plugin-crusoe
+          path: packer-plugin-crusoe
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Build
+        run: go build -o packer-plugin-crusoe
+
+      - name: Generate release tag
+        id: tag
+        run: echo "tag=v0.0.0-$(date +'%Y%m%d%H%M%S')-${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      # - name: Create Release
+      #   uses: softprops/action-gh-release@v2
+      #   with:
+      #     tag_name: ${{ steps.tag.outputs.tag }}
+      #     name: Release ${{ steps.tag.outputs.tag }}
+      #     files: packer-plugin-crusoe
+      #     generate_release_notes: true
+
