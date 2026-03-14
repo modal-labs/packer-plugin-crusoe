@@ -1,0 +1,36 @@
+version: 2
+
+project_name: packer-plugin-crusoe
+
+builds:
+  - id: packer-plugin-crusoe
+    binary: packer-plugin-crusoe
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    ldflags:
+      - -s -w -X main.Version={{ .Major }}.{{ .Minor }}.{{ .Patch }} -X main.VersionPrerelease={{ .Prerelease }}
+
+archives:
+  - id: packer-plugin-crusoe
+    ids:
+      - packer-plugin-crusoe
+    formats:
+      - zip
+    name_template: "{{ .ProjectName }}_v{{ .Version }}_x5.0_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "{{ .ProjectName }}_v{{ .Version }}_SHA256SUMS"
+
+release:
+  prerelease: auto
+
+changelog:
+  disable: true

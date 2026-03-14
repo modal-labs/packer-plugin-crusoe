@@ -15,12 +15,18 @@ A [Packer](https://www.packer.io/) plugin that enables automated creation of cus
 ### Installation
 
 ```bash
+# Install published releases with packer init / packer build
+packer init image.pkr.hcl
+
 # Build from source
 make build
 
 # Install to Packer plugins directory (typically '$HOME/.config/packer/plugins')
 make install
 ```
+
+Tagged `vX.Y.Z` releases are published automatically to GitHub Releases by
+GitHub Actions so Packer can download this plugin directly from the repository.
 
 Or use the install script:
 ```bash
@@ -152,4 +158,3 @@ This project is maintained by Modal Labs.
 - [Crusoe Cloud](https://crusoecloud.com)
 - [Packer Documentation](https://www.packer.io/docs)
 - [Crusoe API Documentation](https://docs.crusoecloud.com)
-

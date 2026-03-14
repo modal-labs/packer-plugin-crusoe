@@ -14,6 +14,7 @@ func TestConfigPrepare_Required(t *testing.T) {
 			name: "missing access_key_id",
 			config: map[string]interface{}{
 				"secret_access_key": "test-secret",
+				"project_id":        "test-project",
 				"location":          "us-northcentral1-a",
 				"instance_type":     "a40.1x",
 				"image_id":          "ubuntu22.04:latest",
@@ -24,9 +25,21 @@ func TestConfigPrepare_Required(t *testing.T) {
 			name: "missing secret_access_key",
 			config: map[string]interface{}{
 				"access_key_id": "test-access",
+				"project_id":    "test-project",
 				"location":      "us-northcentral1-a",
 				"instance_type": "a40.1x",
 				"image_id":      "ubuntu22.04:latest",
+			},
+			wantErr: true,
+		},
+		{
+			name: "missing project_id",
+			config: map[string]interface{}{
+				"access_key_id":     "test-access",
+				"secret_access_key": "test-secret",
+				"location":          "us-northcentral1-a",
+				"instance_type":     "a40.1x",
+				"image_id":          "ubuntu22.04:latest",
 			},
 			wantErr: true,
 		},
@@ -35,6 +48,7 @@ func TestConfigPrepare_Required(t *testing.T) {
 			config: map[string]interface{}{
 				"access_key_id":     "test-access",
 				"secret_access_key": "test-secret",
+				"project_id":        "test-project",
 				"instance_type":     "a40.1x",
 				"image_id":          "ubuntu22.04:latest",
 			},
@@ -45,6 +59,7 @@ func TestConfigPrepare_Required(t *testing.T) {
 			config: map[string]interface{}{
 				"access_key_id":     "test-access",
 				"secret_access_key": "test-secret",
+				"project_id":        "test-project",
 				"location":          "us-northcentral1-a",
 				"image_id":          "ubuntu22.04:latest",
 			},
@@ -55,6 +70,7 @@ func TestConfigPrepare_Required(t *testing.T) {
 			config: map[string]interface{}{
 				"access_key_id":     "test-access",
 				"secret_access_key": "test-secret",
+				"project_id":        "test-project",
 				"location":          "us-northcentral1-a",
 				"instance_type":     "a40.1x",
 			},
@@ -65,6 +81,7 @@ func TestConfigPrepare_Required(t *testing.T) {
 			config: map[string]interface{}{
 				"access_key_id":     "test-access",
 				"secret_access_key": "test-secret",
+				"project_id":        "test-project",
 				"location":          "us-northcentral1-a",
 				"instance_type":     "a40.1x",
 				"image_id":          "ubuntu22.04:latest",
@@ -77,6 +94,7 @@ func TestConfigPrepare_Required(t *testing.T) {
 			config: map[string]interface{}{
 				"access_key_id":     "test-access",
 				"secret_access_key": "test-secret",
+				"project_id":        "test-project",
 				"location":          "us-northcentral1-a",
 				"instance_type":     "a40.1x",
 				"image_id":          "ubuntu22.04:latest",
@@ -110,6 +128,7 @@ func TestConfigPrepare_Defaults(t *testing.T) {
 	config := map[string]interface{}{
 		"access_key_id":     "test-access",
 		"secret_access_key": "test-secret",
+		"project_id":        "test-project",
 		"location":          "us-northcentral1-a",
 		"instance_type":     "a40.1x",
 		"image_id":          "ubuntu22.04:latest",
@@ -198,6 +217,7 @@ func TestConfigPrepare_Timeouts(t *testing.T) {
 			config := map[string]interface{}{
 				"access_key_id":     "test-access",
 				"secret_access_key": "test-secret",
+				"project_id":        "test-project",
 				"location":          "us-northcentral1-a",
 				"instance_type":     "a40.1x",
 				"image_id":          "ubuntu22.04:latest",
@@ -256,6 +276,7 @@ func TestConfigPrepare_ImageNameLength(t *testing.T) {
 			config := map[string]interface{}{
 				"access_key_id":     "test-access",
 				"secret_access_key": "test-secret",
+				"project_id":        "test-project",
 				"location":          "us-northcentral1-a",
 				"instance_type":     "a40.1x",
 				"image_id":          "ubuntu22.04:latest",
