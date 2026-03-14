@@ -30,3 +30,4 @@ crash.log
 Thumbs.db
 
 build/
+dist/
