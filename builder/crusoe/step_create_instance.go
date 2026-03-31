@@ -60,6 +60,12 @@ func (s *stepCreateInstance) Run(ctx context.Context, state multistep.StateBag) 
 		NetworkInterfaces: networkInterfaces,
 	}
 
+	if c.IBPartitionID != "" {
+		instanceReq.HostChannelAdapters = []HostChannelAdapter{
+			{IBPartitionID: c.IBPartitionID},
+		}
+	}
+
 	// Check if we're using an ephemeral SSH key pair
 	if ephemeralKey, ok := state.GetOk("ephemeral_ssh_key_pair"); ok && ephemeralKey.(bool) {
 		// Generate cloud-init script with the ephemeral public key

@@ -55,6 +55,9 @@ type Config struct {
 	ImageDescription string `mapstructure:"image_description"`
 	SkipPublish   bool   `mapstructure:"skip_publish"`
 
+	// IB Partition
+	IBPartitionID string `mapstructure:"ib_partition_id"`
+
 	// Disk settings
 	DiskSizeGiB int `mapstructure:"disk_size_gib"`
 
