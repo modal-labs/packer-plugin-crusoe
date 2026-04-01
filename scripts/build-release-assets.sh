@@ -35,7 +35,7 @@ for platform in "${platforms[@]}"; do
   build_dir="$tmp_dir/${goos}_${goarch}"
   mkdir -p "$build_dir"
 
-  binary_name="$project_name"
+  binary_name="${project_name}_v${version}_${api_version}_${goos}_${goarch}"
   if [[ "$goos" == "windows" ]]; then
     binary_name="${binary_name}.exe"
   fi
@@ -56,5 +56,5 @@ done
 
 (
   cd "$dist_dir"
-  sha256sum ./*.zip > "${project_name}_v${version}_SHA256SUMS"
+  sha256sum *.zip > "${project_name}_v${version}_SHA256SUMS"
 )
