@@ -48,6 +48,8 @@ func (s *stepShutdown) Run(ctx context.Context, state multistep.StateBag) multis
 		}
 
 		ui.Say("Instance successfully stopped")
+		ui.Say(fmt.Sprintf("Waiting %ds for shutdown to fully finalize...", ShutdownDelaySec))
+		time.Sleep(ShutdownDelaySec * time.Second)
 		return multistep.ActionContinue
 	}
 
