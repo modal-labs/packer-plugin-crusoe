@@ -235,12 +235,27 @@ func (s *stepCreateInstance) Cleanup(state multistep.StateBag) {
 		return
 	}
 
-	ui := state.Get("ui").(packer.Ui)
 	c := state.Get("config").(*Config)
+	ui := state.Get("ui").(packer.Ui)
 	inst := instance.(*Instance)
 
+	// The Crusoe API requires instances to be stopped before deletion. If the
+	// build failed before the shutdown step ran, the instance may still be
+	// running. Stop it here and wait before issuing the delete.
+	current, err := s.client.GetInstance(inst.ID)
+	if err != nil {
+		ui.Error(fmt.Sprintf("Error getting instance state during cleanup: %s", err))
+	} else if current.State != "STATE_SHUTOFF" {
+		ui.Say(fmt.Sprintf("Stopping instance %s before deletion...", inst.ID))
+		stopReq := &UpdateInstanceRequest{Action: "STOP"}
+		if stopErr := s.client.UpdateInstance(inst.ID, stopReq); stopErr != nil {
+			ui.Error(fmt.Sprintf("Error stopping instance during cleanup: %s", stopErr))
+		} else if waitErr := waitForInstanceState("STATE_SHUTOFF", inst.ID, s.client, c.instanceTimeout); waitErr != nil {
+			ui.Error(fmt.Sprintf("Error waiting for instance to stop during cleanup: %s", waitErr))
+		}
+	}
+
 	attempts := max(1, c.APICallRetries+1)
-	var err error
 	for attempt := 0; attempt < attempts; attempt++ {
 		if attempt > 0 {
 			ui.Say(fmt.Sprintf("Retrying delete instance API call (attempt %d/%d)...", attempt+1, attempts))
