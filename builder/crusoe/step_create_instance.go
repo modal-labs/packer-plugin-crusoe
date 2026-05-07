@@ -255,5 +255,5 @@ func (s *stepCreateInstance) Cleanup(state multistep.StateBag) {
 		}
 		ui.Error(fmt.Sprintf("Delete instance failed: %s", err))
 	}
-	state.Put("error", err)
+	ui.Error(fmt.Sprintf("All %d delete attempts failed for instance %s; instance may be leaked", attempts, inst.ID))
 }
