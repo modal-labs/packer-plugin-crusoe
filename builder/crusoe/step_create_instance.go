@@ -236,10 +236,24 @@ func (s *stepCreateInstance) Cleanup(state multistep.StateBag) {
 	}
 
 	ui := state.Get("ui").(packer.Ui)
+	c := state.Get("config").(*Config)
 	inst := instance.(*Instance)
 
-	ui.Say("Destroying instance " + inst.ID)
-	if err := s.client.DeleteInstance(inst.ID); err != nil {
-		state.Put("error", err)
+	attempts := max(1, c.APICallRetries+1)
+	var err error
+	for attempt := 0; attempt < attempts; attempt++ {
+		if attempt > 0 {
+			ui.Say(fmt.Sprintf("Retrying delete instance API call (attempt %d/%d)...", attempt+1, attempts))
+			time.Sleep(apiCallRetryBackoff)
+		}
+
+		ui.Say(fmt.Sprintf("Destroying instance %s (attempt %d/%d)", inst.ID, attempt+1, attempts))
+		err = s.client.DeleteInstance(inst.ID)
+		if err == nil {
+			ui.Say(fmt.Sprintf("Instance %s destroyed successfully", inst.ID))
+			return
+		}
+		ui.Error(fmt.Sprintf("Delete instance failed: %s", err))
 	}
+	state.Put("error", err)
 }
